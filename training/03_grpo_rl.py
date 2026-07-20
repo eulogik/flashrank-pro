@@ -31,15 +31,16 @@ class RLDataset(Dataset):
         with open(data_path) as f:
             for sid, line in enumerate(f):
                 s = json.loads(line)
-                for k_idx in range(k_samples):
-                    for doc_idx, score in enumerate(s["teacher_scores"]):
-                        doc = s["positive"] if doc_idx == 0 else s["negatives"][doc_idx - 1]
-                        self.examples.append({
-                            "query": s["query"],
-                            "doc": doc,
-                            "teacher_score": score,
-                            "query_id": sid,
-                        })
+                docs = [s["positive"]] + s["negatives"]
+                scores = s["teacher_scores"]
+                n_docs = min(len(docs), k_samples)
+                for i in range(n_docs):
+                    self.examples.append({
+                        "query": s["query"],
+                        "doc": docs[i],
+                        "teacher_score": scores[i] if isinstance(scores, list) else scores,
+                        "query_id": sid,
+                    })
 
     def __len__(self):
         return len(self.examples)
@@ -154,17 +155,17 @@ def main(
             teacher_scores = batch["teacher_scores"].to(accelerator.device)
             query_ids = batch["query_ids"].to(accelerator.device)
 
-            student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
+            student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1).clamp(-50, 50)
 
             with torch.no_grad():
-                ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
+                ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1).clamp(-50, 50)
 
             rewards = grpo_reward(student_logits, teacher_scores, query_ids)
             normalized_rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
 
             kl_div = F.kl_div(
-                F.log_softmax(student_logits, dim=-1),
-                F.softmax(ref_logits.detach(), dim=-1),
+                F.log_softmax(student_logits.view(-1), dim=-1),
+                F.softmax(ref_logits.view(-1).detach(), dim=-1),
                 reduction="batchmean",
             )
 
