@@ -1,6 +1,9 @@
 <p align="center">
   <h1 align="center">⚡ FlashRank-Pro</h1>
   <p align="center">
+    Built by <a href="https://eulogik.com"><strong>Eulogik</strong></a>
+  </p>
+  <p align="center">
     <em>The most parameter-efficient reranker in the world.</em><br>
     <strong>149M params beating 1.5B models.</strong> Apache 2.0. 50ms latency. CPU-friendly.
   </p>
@@ -187,6 +190,6 @@ Built on [ModernBERT](https://github.com/AnswerDotAI/ModernBERT) by AnswerDotAI.
 ---
 
 <p align="center">
-  <sub>Built with ❤️ for the open-source RAG community</sub><br>
+  <strong><a href="https://eulogik.com">Eulogik</a></strong> — building efficient AI for production RAG.<br>
   <sub>If FlashRank-Pro saves you GPU dollars, <a href="https://github.com/eulogik/flashrank-pro">star the repo</a> ⭐</sub>
 </p>

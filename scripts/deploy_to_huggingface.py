@@ -13,7 +13,7 @@ from huggingface_hub import HfApi, create_repo
 
 def main(
     model_path: str = "models/flashrank-pro-merged",
-    repo_id: str = "flashrank-pro-base",
+    repo_id: str = "eulogik/flashrank-pro-base",
     private: bool = False,
     token: Optional[str] = None,
 ):

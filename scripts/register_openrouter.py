@@ -11,7 +11,7 @@ import json
 
 def main(
     model_id: str = "flashrank-pro-base",
-    huggingface_repo: str = "your-org/flashrank-pro-base",
+    huggingface_repo: str = "eulogik/flashrank-pro-base",
     description: str = "Tiny, fast, state-of-the-art reranker. 149M params, 50ms latency, beats 1.5B models. Apache 2.0, multilingual, 32K context.",
     pricing_per_1k_tokens: float = 0.001,
 ):
