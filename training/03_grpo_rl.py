@@ -107,7 +107,7 @@ def main(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16, ignore_mismatched_sizes=True)
 
     lora_config = LoraConfig(
         r=32,
