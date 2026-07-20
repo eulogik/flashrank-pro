@@ -5,6 +5,29 @@
 
 ---
 
+## Session 003 — Notebook hardened for private repo
+
+**Date:** 2026-07-20
+
+### Changes
+- **GH_TOKEN support:** Notebook now accepts `GH_TOKEN` secret for cloning private repos
+- **Fallback upload:** If no GH_TOKEN, prompts user to upload repo zip directly via Colab's file upload widget
+- **Public clone fallback:** Tries anonymous clone first (will fail for private, but supports SSH auth)
+- **Self-contained merge cell:** Stage 4 now defines all its own paths instead of relying on kernel variables from previous cells
+- **Clearer instructions:** Header doc now explains exactly what each secret is for and why
+
+### How to use with private repo
+1. Download notebook from local clone, upload to Colab
+2. Add `GH_TOKEN` in Secrets (optional but recommended)
+3. Runtime → Change runtime type → T4 GPU
+4. Runtime → Run all
+
+### State
+- Notebook validated (all cells pass basic Python syntax + brace balance checks)
+- Last commit: `ef89395`
+
+---
+
 ## Session 002 — Colab Notebook & Git Push
 
 **Date:** 2026-07-20
