@@ -14,8 +14,6 @@ Colab T4: ~2h.
 import json
 import os
 
-os.environ["PEFT_USE_TORCHAO"] = "0"
-
 from typing import Optional
 
 import torch
@@ -27,6 +25,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_linear_schedule_with_warmup
 from peft import LoraConfig, get_peft_model
+import peft.tuners.lora.torchao
+peft.tuners.lora.torchao.is_torchao_available = lambda: False
 
 
 def compute_fine_grained_score(model, input_ids, attention_mask, tokenizer):

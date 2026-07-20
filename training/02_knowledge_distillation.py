@@ -143,6 +143,8 @@ def main(
 
     if use_lora:
         from peft import LoraConfig, get_peft_model
+        import peft.tuners.lora.torchao
+        peft.tuners.lora.torchao.is_torchao_available = lambda: False
         lora_config = LoraConfig(
             r=lora_r,
             lora_alpha=lora_r * 2,
