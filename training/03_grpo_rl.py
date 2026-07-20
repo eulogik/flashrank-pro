@@ -191,12 +191,7 @@ def main(
             r_std = rewards.std() + 1e-8
             normalized_rewards = (rewards - r_mean) / r_std
 
-            flat_s = student_logits.view(-1).float()
-            flat_r = ref_logits.view(-1).float().detach()
-
-            ref_probs = F.softmax(flat_r, dim=-1).clamp(min=1e-7)
-            student_log_probs = F.log_softmax(flat_s, dim=-1)
-            kl_div = (ref_probs * (ref_probs.log() - student_log_probs)).sum()
+            kl_div = F.mse_loss(student_logits, ref_logits.detach())
 
             pg_loss = -(normalized_rewards * student_logits).mean()
             loss = pg_loss + beta * kl_div
