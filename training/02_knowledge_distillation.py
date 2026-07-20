@@ -77,6 +77,7 @@ def hybrid_distillation_loss(student_logits, teacher_scores, n_negs, margin_beta
     if teacher.dim() == 3 and teacher.size(-1) == 2:
         teacher = teacher[..., -1]
 
+    teacher = teacher.to(student_scores.dtype)
     pointwise_loss = F.mse_loss(student_scores, teacher)
 
     margin_loss = 0.0
