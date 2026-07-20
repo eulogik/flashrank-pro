@@ -5,6 +5,44 @@
 
 ---
 
+## Session 002 — Colab Notebook & Git Push
+
+**Date:** 2026-07-20
+
+### What Was Built
+- `notebooks/FlashRank_Pro_Training.ipynb` — bulletproof resumable notebook
+- README upgraded with beautiful badges, comparison tables, architecture diagrams
+- Eulogik branding added throughout (readme, deploy scripts, OpenRouter config)
+- Pushed to `eulogik/flashrank-pro` under org
+
+### Notebook Design Decisions
+- **Resumable:** Each cell checks Drive for previous output before running. Runtime → Run all picks up where it left off.
+- **Drive-backed:** All data/models saved to `MyDrive/flashrank-pro/` after each stage
+- **Run-all safe:** No manual steps between cells — dependencies, mount, clone, resume all automatic
+- **LORA_FLAG fix:** `--use_lora` only passed as flag for `large` model (not as `true`/`false` string)
+- **Secrets-based auth:** Uses Colab's 🔑 Secrets panel for OPENAI_API_KEY and HF_TOKEN
+
+### Notebook Cell Map
+
+| Cell | Stage | Resume Check | Drive Save |
+|------|-------|-------------|------------|
+| 0 | Setup (deps, mount, clone, restore) | DEPS_INSTALLED marker ✅ | Restores data/ and models/ |
+| 1 | Stage 1: Data generation | `data/synthetic_training_data.jsonl` exists | Copied to Drive |
+| 2 | Stage 2: KD | `models/*-kd-en/` exists | Copied to Drive |
+| 3 | Stage 2b: Multilingual KD | `models/*-kd-multilingual/` exists | Copied to Drive |
+| 4 | Stage 3: GRPO RL | `models/*-rl/` exists | Copied to Drive |
+| 5 | Stage 4: SLERP merge | `models/*-merged/` exists | Copied to Drive |
+| 6 | Quick sanity eval | Merged model exists | N/A |
+| 7 | HF deploy | Merged model exists + HF_TOKEN | N/A |
+
+### State at Handoff
+- Repo is live at `github.com/eulogik/flashrank-pro` (private)
+- All 20 files committed
+- Notebook ready for direct upload to Colab
+- Next: run Stage 1 (needs OPENAI_API_KEY), then Stages 2-3 on T4
+
+---
+
 ## Session 001 — Project Scaffold & Strategic Definition
 
 **Date:** 2026-07-20
