@@ -96,7 +96,7 @@ Cross-encoder architecture processes query and document together as a single seq
 ```
 Stage 1: Data Generation        Stage 2: KD                Stage 3: RL              Stage 4: Merge
 ─────────────────────────  ─────────────────────    ────────────────────   ─────────────────────
-LLM → 50K synthetic queries  Teacher → ModernBERT     GRPO prompt warmup     SLERP merge of
+HF dataset → query-doc pairs  Teacher → ModernBERT  GRPO prompt warmup     SLERP merge of
     + hard negative mining    (soft labels, hybrid     + fine-grained score   English + multilingual
     + teacher scoring         pointwise-MSE loss)       learning (K=8)        + RL checkpoints
 ```
@@ -128,7 +128,7 @@ Every design choice is backed by published research:
 # Install
 pip install -e .
 
-# Stage 1: Generate synthetic training data (needs OPENAI_API_KEY)
+# Stage 1: Generate synthetic training data (free, no API key needed)
 python training/01_generate_synthetic_data.py --n_queries 50000
 
 # Stage 2: Knowledge distillation (run on CUDA/MPS)

@@ -36,7 +36,7 @@ Stage 1: Data Generation ───→ Stage 2: KD ───→ Stage 3: RL ─�
 
 | Stage | File | What | Hardware | Time | Cost |
 |-------|------|------|----------|------|------|
-| 1 | `01_generate_synthetic_data.py` | Generate 50K query-doc pairs via GPT-4o-mini, mine hard negatives, score with teacher | Any (API) | 2h async | ~$7.50 |
+| 1 | `01_generate_synthetic_data.py` | Load query-doc pairs from HF dataset (free), mine hard negatives, score with teacher | Any (CPU) | ~30min | $0 |
 | 2 | `02_knowledge_distillation.py` | Distill from mxbai-rerank-large-v2 or Qwen3-Reranker-8B into ModernBERT | Colab T4 (16GB) | ~3h (base), ~3h (large LoRA) | $0 |
 | 3 | `03_grpo_rl.py` | GRPO prompt warmup + fine-grained scoring with LoRA | Colab T4 (16GB) | ~2h | $0 |
 | 4 | `04_slerp_merge.py` | SLERP merge of KD + RL + multilingual checkpoints | Any (CPU) | 5min | $0 |
@@ -270,7 +270,7 @@ your-org/flashrank-pro-large
 cd /Users/gautamkishore/Code/reranker
 pip install -e .
 
-# Stage 1: Generate data (run locally, needs OPENAI_API_KEY)
+# Stage 1: Generate data (run locally, no API key needed)
 python training/01_generate_synthetic_data.py --n_queries 50000
 
 # Stage 2: Knowledge Distillation (run on Colab T4)
@@ -307,6 +307,6 @@ bash scripts/train_full_pipeline.sh base
 2. **Colab session timeout** — Stages 2-3 each fit in one session. Save intermediate checkpoints to Google Drive between stages.
 3. **ModernBERT large OOM on T4** — Use LoRA (`--use_lora true`) for large. Base fits full FT with batch 8.
 4. **Teacher model CPU OOM** — `mxbai-rerank-large-v2` (1.5B) needs ~6GB. `Qwen3-Reranker-8B` needs ~16GB. Use the smaller teacher for local scoring.
-5. **OpenAI API rate limits** — Stage 1 generates 50K queries. Use exponential backoff and batch size 10. Budget ~$7.50 for GPT-4o-mini.
+5. **OpenAI API rate limits** — Stage 1 generates queries using existing HF datasets (free). Only uses API if `--llm_endpoint` is explicitly passed.
 6. **SLERP merge path mismatch** — The pytorch_model.bin keys must match between checkpoints. Use the same base model config for all.
 7. **sentence-transformers CrossEncoder vs our model** — Our `Reranker` class is a thin wrapper. For MTEB/BEIR eval, we use `sentence-transformers.CrossEncoder(model_path)` because those frameworks expect it.
