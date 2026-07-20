@@ -17,6 +17,8 @@ import os
 import random
 from typing import Optional
 
+import torch
+
 import numpy as np
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
@@ -142,24 +144,19 @@ def score_with_teacher(
     teacher_name: str = "mixedbread-ai/mxbai-rerank-large-v2",
 ) -> list[dict]:
     """Score pairs using a teacher reranker for distillation soft labels."""
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    from sentence_transformers import CrossEncoder
 
-    tokenizer = AutoTokenizer.from_pretrained(teacher_name)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        teacher_name, torch_dtype=torch.float16, device_map="auto",
-    )
-    model.eval()
+    model = CrossEncoder(teacher_name, device="cuda" if torch.cuda.is_available() else "cpu")
 
     for p in tqdm(pairs, desc="Scoring with teacher"):
         docs = [p["positive"]] + p["negatives"]
-        texts = [f"{p['query']} {tokenizer.sep_token or '[SEP]'} {d}" for d in docs]
-        enc = tokenizer(texts, padding=True, truncation=True, max_length=512, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            logits = model(**enc).logits.squeeze(-1)
-            p["teacher_scores"] = torch.sigmoid(logits).cpu().tolist()
-            if isinstance(p["teacher_scores"], float):
-                p["teacher_scores"] = [p["teacher_scores"]]
+        pairs_list = [(p["query"], d) for d in docs]
+        scores = model.predict(pairs_list, show_progress_bar=False)
+        if scores.ndim == 2 and scores.shape[1] == 2:
+            scores = scores[:, -1]
+        p["teacher_scores"] = scores.tolist()
+        if isinstance(p["teacher_scores"], float):
+            p["teacher_scores"] = [p["teacher_scores"]]
 
     return pairs
 

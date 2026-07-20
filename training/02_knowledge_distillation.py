@@ -52,14 +52,13 @@ class RerankingDataset(Dataset):
 
 
 def collate_fn(batch, tokenizer, max_length):
-    queries = [b["query"] for b in batch]
-    all_docs = []
-    for b in batch:
-        all_docs.append(b["positive"])
-        all_docs.extend(b["negatives"])
     n_negs = len(batch[0]["negatives"])
-    teacher_scores = [b["teacher_scores"] for b in batch]
-    texts = [f"{q} {tokenizer.sep_token or '[SEP]'} {d}" for q in batch for d in ([b["positive"]] + b["negatives"])]
+    texts = []
+    teacher_scores = []
+    for b in batch:
+        docs = [b["positive"]] + b["negatives"]
+        teacher_scores.append(b["teacher_scores"])
+        texts.extend(f"{b['query']} {tokenizer.sep_token or '[SEP]'} {d}" for d in docs)
     enc = tokenizer(texts, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
     return {
         "input_ids": enc["input_ids"],
@@ -74,6 +73,9 @@ def hybrid_distillation_loss(student_logits, teacher_scores, n_negs, margin_beta
     n_docs = n_negs + 1
     student_scores = student_logits.view(batch_size // n_docs, n_docs)
     teacher = teacher_scores.to(student_scores.device)
+
+    if teacher.dim() == 3 and teacher.size(-1) == 2:
+        teacher = teacher[..., -1]
 
     pointwise_loss = F.mse_loss(student_scores, teacher)
 
