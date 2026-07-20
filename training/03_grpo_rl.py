@@ -179,21 +179,22 @@ def main(
             query_ids = batch["query_ids"].to(accelerator.device)
 
             student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
-            student_logits = student_logits.clamp(-50, 50)
+            student_logits = torch.nan_to_num(student_logits, nan=0.0, posinf=50.0, neginf=-50.0).clamp(-50, 50)
 
             with torch.no_grad():
                 ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
-                ref_logits = ref_logits.clamp(-50, 50)
+                ref_logits = torch.nan_to_num(ref_logits, nan=0.0, posinf=50.0, neginf=-50.0).clamp(-50, 50)
 
             rewards = grpo_reward(student_logits, teacher_scores, query_ids)
+            rewards = torch.nan_to_num(rewards, nan=0.0)
 
             r_mean = rewards.mean()
             r_std = rewards.std() + 1e-8
             normalized_rewards = (rewards - r_mean) / r_std
 
-            kl_div = F.mse_loss(student_logits, ref_logits.detach())
+            kl_div = F.mse_loss(student_logits.float(), ref_logits.float().detach())
 
-            pg_loss = -(normalized_rewards * student_logits).mean()
+            pg_loss = -(normalized_rewards * student_logits.float()).mean()
             loss = pg_loss + beta * kl_div
 
             accelerator.backward(loss)
