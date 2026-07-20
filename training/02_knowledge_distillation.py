@@ -94,6 +94,27 @@ def hybrid_distillation_loss(student_logits, teacher_scores, n_negs, margin_beta
     return pointwise_loss + margin_beta * margin_loss
 
 
+def find_latest_checkpoint(output_dir: str) -> Optional[int]:
+    """Find the latest completed epoch checkpoint."""
+    if not os.path.exists(output_dir):
+        return None
+    epochs = []
+    for d in os.listdir(output_dir):
+        if d.startswith("checkpoint-epoch-"):
+            try:
+                epochs.append(int(d.split("-")[-1]))
+            except ValueError:
+                pass
+    return max(epochs) if epochs else None
+
+
+def save_checkpoint(accelerator, output_dir, epoch):
+    ckpt_dir = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
+    accelerator.save_state(ckpt_dir)
+    if accelerator.is_main_process:
+        print(f"Checkpoint saved: {ckpt_dir}")
+
+
 def main(
     model_name: str = "answerdotai/ModernBERT-base",
     data_path: str = "data/synthetic_training_data.jsonl",
@@ -147,12 +168,21 @@ def main(
 
     model, optimizer, loader, scheduler = accelerator.prepare(model, optimizer, loader, scheduler)
 
+    resume_epoch = find_latest_checkpoint(output_dir)
+    start_epoch = 0
+    if resume_epoch is not None:
+        ckpt = os.path.join(output_dir, f"checkpoint-epoch-{resume_epoch}")
+        accelerator.load_state(ckpt)
+        start_epoch = resume_epoch
+        if accelerator.is_main_process:
+            print(f"Resumed from epoch {resume_epoch} checkpoint ({ckpt})")
+
     if accelerator.is_main_process:
         os.makedirs(output_dir, exist_ok=True)
         print(f"Training {model_name} | Batch {batch_size} | LR {learning_rate} | Epochs {num_epochs}")
         print(f"Total steps: {total_steps} | Samples: {len(dataset)}")
 
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         model.train()
         total_loss = 0.0
         for step, batch in enumerate(tqdm(loader, desc=f"Epoch {epoch+1}/{num_epochs}")):
@@ -171,6 +201,8 @@ def main(
         avg_loss = total_loss / len(loader)
         if accelerator.is_main_process:
             print(f"Epoch {epoch+1} avg loss: {avg_loss:.4f}")
+
+        save_checkpoint(accelerator, output_dir, epoch + 1)
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
