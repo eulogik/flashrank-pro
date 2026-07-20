@@ -117,13 +117,15 @@ def main(
     num_epochs: int = 1,
     max_length: int = 512,
 ):
-    accelerator = Accelerator(mixed_precision="fp16")
+    accelerator = Accelerator()
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
+    if accelerator.is_main_process:
+        print(f"Model loaded in fp16 ({sum(p.numel() for p in model.parameters())/1e6:.0f}M params)")
 
     lora_config = LoraConfig(
         r=32,
@@ -135,7 +137,7 @@ def main(
     )
     model = get_peft_model(model, lora_config)
 
-    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
+    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
     for p in ref_model.parameters():
         p.requires_grad = False
 
@@ -196,6 +198,14 @@ def main(
 
             pg_loss = -(normalized_rewards * student_logits.float()).mean()
             loss = pg_loss + beta * kl_div
+
+            if torch.isnan(loss):
+                if accelerator.is_main_process:
+                    print(f"  NaN detected | pg_loss: {pg_loss.item():.4f} | kl: {kl_div.item():.4f} | "
+                          f"rewards: min={rewards.min().item():.4f} max={rewards.max().item():.4f} | "
+                          f"scores: min={student_logits.min().item():.4f} max={student_logits.max().item():.4f} | "
+                          f"n_scores: min={normalized_rewards.min().item():.4f} max={normalized_rewards.max().item():.4f}")
+                loss = pg_loss  # fallback to just policy gradient
 
             accelerator.backward(loss)
             if accelerator.sync_gradients:
