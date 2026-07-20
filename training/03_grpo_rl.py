@@ -121,8 +121,13 @@ def main(
     try:
         model = get_peft_model(model, lora_config)
     except ValueError:
-        available = [n for n, _ in model.named_modules() if all(x not in n for x in ["embed", "LayerNorm", "dropout", "activation"])]
-        print(f"Available modules: {[n for n in available if any(k in n for k in ['proj', 'linear', 'dense', 'query', 'key', 'value', 'output', 'attention', 'intermediate'])]}")
+        print(f"Model type: {type(model).__name__}")
+        print(f"Config: {model.config}")
+        print("Module sample (first 50):")
+        for i, (n, _) in enumerate(model.named_modules()):
+            if i < 50:
+                print(f"  {n}")
+        print(f"Total modules: {sum(1 for _ in model.named_modules())}")
         raise
 
     ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16, ignore_mismatched_sizes=True)
