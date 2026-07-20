@@ -138,7 +138,7 @@ def main(
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=1,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
     )
 
     if use_lora:
@@ -179,6 +179,10 @@ def main(
         if accelerator.is_main_process:
             print(f"Resumed from epoch {resume_epoch} checkpoint ({ckpt})")
 
+    bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
+    if bad and accelerator.is_main_process:
+        print(f"WARNING: {len(bad)} params contain NaN/inf at start (e.g. {bad[:3]})")
+
     if accelerator.is_main_process:
         os.makedirs(output_dir, exist_ok=True)
         print(f"Training {model_name} | Batch {batch_size} | LR {learning_rate} | Epochs {num_epochs}")
@@ -209,7 +213,10 @@ def main(
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         unwrapped = accelerator.unwrap_model(model)
-        unwrapped.save_pretrained(output_dir)
+        if any(torch.isnan(p).any() or torch.isinf(p).any() for p in unwrapped.parameters()):
+            print("ERROR: Final model has NaN/inf weights — NOT saving. Check loss/inputs.")
+        else:
+            unwrapped.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
         print(f"Model saved to {output_dir}")
 

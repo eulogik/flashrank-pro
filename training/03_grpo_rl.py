@@ -140,6 +140,11 @@ def main(
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
     model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
+    bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
+    if bad and accelerator.is_main_process:
+        print(f"FATAL: {len(bad)} params in checkpoint contain NaN/inf (e.g. {bad[:3]}). "
+              f"The Stage 2 checkpoint is corrupted — retrain Stage 2 in fp32.")
+        raise SystemExit(1)
     if accelerator.is_main_process:
         print(f"Model loaded in fp32 ({sum(p.numel() for p in model.parameters())/1e6:.0f}M params)")
 
