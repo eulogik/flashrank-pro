@@ -1,0 +1,46 @@
+# FlashRank-Pro Training Configuration
+
+model:
+  base_name: "answerdotai/ModernBERT-base"
+  large_name: "answerdotai/ModernBERT-large"
+  max_length: 8192
+  num_labels: 1
+
+data:
+  corpus_source: "sentence-transformers/gooaq"
+  n_queries: 50000
+  n_negatives: 4
+
+teacher:
+  name: "mixedbread-ai/mxbai-rerank-large-v2"
+  # Alternative: "Qwen/Qwen3-Reranker-8B"
+
+stage1_distillation:
+  learning_rate: 2e-5
+  batch_size: 8
+  num_epochs: 3
+  max_length: 512
+  margin_beta: 1.0
+  use_lora: false  # false for base, true for large
+  lora_r: 16
+
+stage2_rl:
+  learning_rate: 1e-4
+  batch_size: 4
+  k_samples: 8
+  beta: 0.04
+  num_epochs: 1
+  max_length: 512
+  lora_r: 32
+
+stage3_merge:
+  checkpoints:
+    - models/flashrank-pro-base-kd-en
+    - models/flashrank-pro-base-kd-multilingual
+    - models/flashrank-pro-base-rl
+  weights: [0.35, 0.35, 0.30]
+
+deployment:
+  huggingface_org: "your-org"
+  model_name: "flashrank-pro-base"
+  openrouter_model_id: "flashrank-pro-base"

@@ -1,0 +1,27 @@
+# Models
+models/
+*.bin
+*.safetensors
+checkpoints/
+
+# Data
+data/
+*.jsonl
+
+# Results
+results/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.env

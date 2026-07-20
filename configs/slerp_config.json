@@ -1,0 +1,9 @@
+{
+    "checkpoints": [
+        "models/flashrank-pro-base-kd-en",
+        "models/flashrank-pro-base-kd-multilingual",
+        "models/flashrank-pro-base-kd-code",
+        "models/flashrank-pro-base-rl"
+    ],
+    "weights": [0.25, 0.25, 0.25, 0.25]
+}

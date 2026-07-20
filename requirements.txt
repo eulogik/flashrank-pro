@@ -1,0 +1,23 @@
+# Core
+torch>=2.0.0
+transformers>=4.38.0
+sentence-transformers>=3.0.0
+accelerate>=0.25.0
+datasets>=2.14.0
+
+# Training
+peft>=0.8.0
+fire>=0.5.0
+tqdm>=4.64.0
+
+# Data generation (Stage 1)
+openai>=1.0.0
+
+# Evaluation
+numpy
+
+# Optional
+wandb>=0.15.0  # for experiment tracking
+beir>=2.0.0    # for BEIR evaluation
+mteb>=1.0.0    # for MTEB evaluation
+huggingface-hub>=0.20.0  # for deployment
