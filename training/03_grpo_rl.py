@@ -2,9 +2,10 @@
 Stage 3: GRPO Reinforcement Learning for fine-grained scoring.
 
 GRPO (ProRank paper): group-relative policy optimization.
-- Each query has K docs scored: pairwise ranking reward vs teacher
+- Each query's K docs are scored together as a group
+- Pairwise ranking reward vs teacher within each group
 - Relative reward normalization
-- KL divergence against reference model to prevent collapse
+- KL divergence against reference model
 
 Runs as LoRA on top of Stage 2 model.
 Colab T4: ~2h.
@@ -26,32 +27,65 @@ peft.tuners.lora.torchao.is_torchao_available = lambda: False
 
 
 class RLDataset(Dataset):
-    def __init__(self, data_path, k_samples=8):
-        self.examples = []
+    """Each sample = one query with all its docs (positive + negatives).
+
+    Returns grouped query-doc pairs so the reward compares all docs
+    within a query.
+    """
+
+    def __init__(self, data_path, max_docs=8):
+        self.groups = []
+        self.max_docs = max_docs
         with open(data_path) as f:
             for sid, line in enumerate(f):
                 s = json.loads(line)
                 docs = [s["positive"]] + s["negatives"]
                 scores = s["teacher_scores"]
-                n_docs = min(len(docs), k_samples)
-                for i in range(n_docs):
-                    self.examples.append({
-                        "query": s["query"],
-                        "doc": docs[i],
-                        "teacher_score": scores[i] if isinstance(scores, list) else scores,
-                        "query_id": sid,
-                    })
+                if isinstance(scores, list) and len(scores) > 0 and isinstance(scores[0], (list, tuple)):
+                    scores = [sc[-1] for sc in scores]
+                if isinstance(scores, list) and len(scores) > max_docs:
+                    scores = scores[:max_docs]
+                    docs = docs[:max_docs]
+                self.groups.append({
+                    "query": s["query"],
+                    "docs": docs,
+                    "teacher_scores": scores if isinstance(scores, list) else [scores],
+                    "query_id": sid,
+                })
 
     def __len__(self):
-        return len(self.examples)
+        return len(self.groups)
 
     def __getitem__(self, idx):
-        return self.examples[idx]
+        return self.groups[idx]
+
+
+def collate_fn(batch, tokenizer, max_length):
+    all_queries = []
+    all_docs = []
+    all_scores = []
+    all_qids = []
+
+    for g in batch:
+        k = len(g["docs"])
+        all_queries.extend([g["query"]] * k)
+        all_docs.extend(g["docs"])
+        all_scores.extend(g["teacher_scores"][:k])
+        all_qids.extend([g["query_id"]] * k)
+
+    texts = [f"{q} {tokenizer.sep_token or '[SEP]'} {d}" for q, d in zip(all_queries, all_docs)]
+    enc = tokenizer(texts, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+    return {
+        "input_ids": enc["input_ids"],
+        "attention_mask": enc["attention_mask"],
+        "teacher_scores": torch.tensor(all_scores, dtype=torch.float32),
+        "query_ids": torch.tensor(all_qids),
+    }
 
 
 def grpo_reward(student_scores, teacher_scores, query_ids):
     """Pairwise ranking accuracy vs teacher per query group."""
-    rewards = torch.zeros(len(query_ids), device=student_scores.device)
+    rewards = torch.zeros(len(student_scores), device=student_scores.device)
     for qid in query_ids.unique():
         mask = query_ids == qid
         idxs = mask.nonzero().squeeze(-1)
@@ -78,7 +112,7 @@ def main(
     output_dir: str = "models/flashrank-pro-base-rl",
     learning_rate: float = 1e-4,
     batch_size: int = 4,
-    k_samples: int = 8,
+    max_docs: int = 5,
     beta: float = 0.04,
     num_epochs: int = 1,
     max_length: int = 512,
@@ -105,23 +139,12 @@ def main(
     for p in ref_model.parameters():
         p.requires_grad = False
 
-    dataset = RLDataset(data_path, k_samples=k_samples)
+    dataset = RLDataset(data_path, max_docs=max_docs)
+    loader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=True,
+        collate_fn=lambda b: collate_fn(b, tokenizer, max_length),
+    )
 
-    def collate_fn(batch):
-        queries = [b["query"] for b in batch]
-        docs = [b["doc"] for b in batch]
-        teacher_scores = torch.tensor([b["teacher_score"] for b in batch], dtype=torch.float32)
-        query_ids = torch.tensor([b["query_id"] for b in batch])
-        texts = [f"{q} {tokenizer.sep_token or '[SEP]'} {d}" for q, d in zip(queries, docs)]
-        enc = tokenizer(texts, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
-        return {
-            "input_ids": enc["input_ids"],
-            "attention_mask": enc["attention_mask"],
-            "teacher_scores": teacher_scores,
-            "query_ids": query_ids,
-        }
-
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     total_steps = len(loader) * num_epochs
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=int(0.05 * total_steps), num_training_steps=total_steps)
@@ -144,8 +167,8 @@ def main(
 
     if accelerator.is_main_process:
         os.makedirs(output_dir, exist_ok=True)
-        print(f"GRPO RL | Model: {model_path} | K: {k_samples} | Beta: {beta}")
-        print(f"Samples: {len(dataset)} | Steps/epoch: {len(loader)}")
+        print(f"GRPO RL | Model: {model_path} | max_docs: {max_docs} | Beta: {beta}")
+        print(f"Queries: {len(dataset)} | Groups/batch: {batch_size} | Total steps: {total_steps}")
 
     for epoch in range(resume_epoch, num_epochs):
         model.train()
@@ -155,19 +178,25 @@ def main(
             teacher_scores = batch["teacher_scores"].to(accelerator.device)
             query_ids = batch["query_ids"].to(accelerator.device)
 
-            student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1).clamp(-50, 50)
+            student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
+            student_logits = student_logits.clamp(-50, 50)
 
             with torch.no_grad():
-                ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1).clamp(-50, 50)
+                ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
+                ref_logits = ref_logits.clamp(-50, 50)
 
             rewards = grpo_reward(student_logits, teacher_scores, query_ids)
-            normalized_rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
 
-            kl_div = F.kl_div(
-                F.log_softmax(student_logits.view(-1), dim=-1),
-                F.softmax(ref_logits.view(-1).detach(), dim=-1),
-                reduction="batchmean",
-            )
+            r_mean = rewards.mean()
+            r_std = rewards.std() + 1e-8
+            normalized_rewards = (rewards - r_mean) / r_std
+
+            flat_s = student_logits.view(-1).float()
+            flat_r = ref_logits.view(-1).float().detach()
+
+            ref_probs = F.softmax(flat_r, dim=-1).clamp(min=1e-7)
+            student_log_probs = F.log_softmax(flat_s, dim=-1)
+            kl_div = (ref_probs * (ref_probs.log() - student_log_probs)).sum()
 
             pg_loss = -(normalized_rewards * student_logits).mean()
             loss = pg_loss + beta * kl_div
@@ -180,7 +209,7 @@ def main(
             optimizer.zero_grad()
 
             if step % 50 == 0 and accelerator.is_main_process:
-                print(f"Step {step}/{total_steps} | Loss: {loss.item():.4f} | Reward: {rewards.mean().item():.4f} | KL: {kl_div.item():.4f}")
+                print(f"Step {step}/{total_steps} | Loss: {loss.item():.4f} | Reward: {r_mean.item():.4f} | KL: {kl_div.item():.4f}")
 
         ckpt_dir = os.path.join(output_dir, f"checkpoint-epoch-{epoch + 1}")
         accelerator.save_state(ckpt_dir)
