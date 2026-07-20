@@ -75,10 +75,12 @@ def collate_fn(batch, tokenizer, max_length):
 
     texts = [f"{q} {tokenizer.sep_token or '[SEP]'} {d}" for q, d in zip(all_queries, all_docs)]
     enc = tokenizer(texts, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+    scores_tensor = torch.tensor(all_scores, dtype=torch.float32)
+    scores_tensor = torch.nan_to_num(scores_tensor, nan=0.0)
     return {
         "input_ids": enc["input_ids"],
         "attention_mask": enc["attention_mask"],
-        "teacher_scores": torch.tensor(all_scores, dtype=torch.float32),
+        "teacher_scores": scores_tensor,
         "query_ids": torch.tensor(all_qids),
     }
 
@@ -100,6 +102,7 @@ def grpo_reward(student_scores, teacher_scores, query_ids):
             continue
         s = student_scores[idxs]
         t = teacher_scores[idxs]
+        t = torch.nan_to_num(t, nan=0.0)
 
         t_mean = t.mean()
         t_std = t.std() + 1e-8
@@ -136,9 +139,9 @@ def main(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
     if accelerator.is_main_process:
-        print(f"Model loaded in fp16 ({sum(p.numel() for p in model.parameters())/1e6:.0f}M params)")
+        print(f"Model loaded in fp32 ({sum(p.numel() for p in model.parameters())/1e6:.0f}M params)")
 
     lora_config = LoraConfig(
         r=32,
@@ -150,7 +153,7 @@ def main(
     )
     model = get_peft_model(model, lora_config)
 
-    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
+    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
     for p in ref_model.parameters():
         p.requires_grad = False
 
@@ -194,6 +197,9 @@ def main(
             query_ids = batch["query_ids"].to(accelerator.device)
 
             student_logits = model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
+            if torch.isnan(student_logits).any():
+                if accelerator.is_main_process:
+                    print(f"  WARNING: student_logits has NaN before nan_to_num at step {step}")
             student_logits = torch.nan_to_num(student_logits, nan=0.0, posinf=50.0, neginf=-50.0).clamp(-50, 50)
 
             with torch.no_grad():
