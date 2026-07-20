@@ -112,14 +112,20 @@ def main(
     lora_config = LoraConfig(
         r=32,
         lora_alpha=32,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0.1,
         bias="none",
         task_type="SEQ_CLS",
     )
-    model = get_peft_model(model, lora_config)
 
-    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16)
+    try:
+        model = get_peft_model(model, lora_config)
+    except ValueError:
+        available = [n for n, _ in model.named_modules() if all(x not in n for x in ["embed", "LayerNorm", "dropout", "activation"])]
+        print(f"Available modules: {[n for n in available if any(k in n for k in ['proj', 'linear', 'dense', 'query', 'key', 'value', 'output', 'attention', 'intermediate'])]}")
+        raise
+
+    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16, ignore_mismatched_sizes=True)
     for p in ref_model.parameters():
         p.requires_grad = False
 
