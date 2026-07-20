@@ -13,6 +13,7 @@ Cost: Free by default. Only costs if you use --llm_endpoint for generation.
 """
 
 import json
+import math
 import os
 import random
 from typing import Optional
@@ -154,9 +155,13 @@ def score_with_teacher(
         scores = model.predict(pairs_list, show_progress_bar=False)
         if scores.ndim == 2 and scores.shape[1] == 2:
             scores = scores[:, -1]
-        p["teacher_scores"] = scores.tolist()
-        if isinstance(p["teacher_scores"], float):
-            p["teacher_scores"] = [p["teacher_scores"]]
+        scores = scores.tolist()
+        if isinstance(scores, float):
+            scores = [scores]
+        scores = [float(s) for s in scores]
+        if any(math.isnan(s) or math.isinf(s) for s in scores):
+            raise RuntimeError(f"Teacher produced NaN/inf scores for query: {p['query'][:60]}")
+        p["teacher_scores"] = scores
 
     return pairs
 
@@ -213,6 +218,16 @@ def main(
             f.write(json.dumps(p) + "\n")
     print(f"Saved {len(pairs)} examples to {output_path}")
     print(f"  Each example: query + positive + {n_negatives} negatives + teacher scores")
+
+    sample = pairs[0]
+    ts = sample["teacher_scores"]
+    assert isinstance(ts, list) and len(ts) == n_negatives + 1, f"Bad score count: {ts}"
+    assert all(math.isfinite(s) for s in ts), f"Non-finite teacher score: {ts}"
+    spread = max(ts) - min(ts)
+    if spread < 1e-3:
+        print("  WARNING: teacher scores have near-zero spread (set has no ranking signal)")
+    print(f"  Sample teacher scores (pos first): {[round(s, 4) for s in ts]}")
+    print(f"  Spread: {spread:.4f} (higher = better ranking signal)")
 
 
 if __name__ == "__main__":

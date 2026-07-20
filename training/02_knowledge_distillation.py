@@ -48,7 +48,10 @@ class RerankingDataset(Dataset):
 
     def __getitem__(self, idx):
         s = self.samples[idx]
-        return {"query": s["query"], "positive": s["positive"], "negatives": s["negatives"], "teacher_scores": s["teacher_scores"]}
+        ts = s["teacher_scores"]
+        if isinstance(ts, list) and ts and isinstance(ts[0], list) and len(ts[0]) == 2:
+            ts = [float(t[-1]) for t in ts]
+        return {"query": s["query"], "positive": s["positive"], "negatives": s["negatives"], "teacher_scores": ts}
 
 
 def collate_fn(batch, tokenizer, max_length):
