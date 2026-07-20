@@ -82,13 +82,13 @@ def main(
     num_epochs: int = 1,
     max_length: int = 512,
 ):
-    accelerator = Accelerator()
+    accelerator = Accelerator(mixed_precision="fp16")
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
 
     lora_config = LoraConfig(
         r=32,
@@ -100,7 +100,7 @@ def main(
     )
     model = get_peft_model(model, lora_config)
 
-    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float16)
+    ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
     for p in ref_model.parameters():
         p.requires_grad = False
 
