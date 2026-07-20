@@ -146,7 +146,7 @@ def main(
         lora_config = LoraConfig(
             r=lora_r,
             lora_alpha=lora_r * 2,
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+            target_modules=["Wqkv", "Wo", "Wi"],
             lora_dropout=0.1,
             bias="none",
             task_type="SEQ_CLS",

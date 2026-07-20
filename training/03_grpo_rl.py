@@ -112,23 +112,13 @@ def main(
     lora_config = LoraConfig(
         r=32,
         lora_alpha=32,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        target_modules=["Wqkv", "Wo", "Wi"],
         lora_dropout=0.1,
         bias="none",
         task_type="SEQ_CLS",
     )
 
-    try:
-        model = get_peft_model(model, lora_config)
-    except ValueError:
-        print(f"Model type: {type(model).__name__}")
-        print(f"Config: {model.config}")
-        print("Module sample (first 50):")
-        for i, (n, _) in enumerate(model.named_modules()):
-            if i < 50:
-                print(f"  {n}")
-        print(f"Total modules: {sum(1 for _ in model.named_modules())}")
-        raise
+    model = get_peft_model(model, lora_config)
 
     ref_model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=2, torch_dtype=torch.float16, ignore_mismatched_sizes=True)
     for p in ref_model.parameters():
