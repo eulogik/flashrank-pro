@@ -84,8 +84,14 @@ def collate_fn(batch, tokenizer, max_length):
 
 
 def grpo_reward(student_scores, teacher_scores, query_ids):
-    """Pairwise ranking accuracy vs teacher per query group."""
-    rewards = torch.zeros(len(student_scores), device=student_scores.device)
+    """Group-relative advantage: teacher score centered within each query.
+
+    Uses the teacher's relative preference as the reward signal so gradients
+    are always non-zero (within-query variance > 0). Returns both the
+    advantage used for the loss and the pairwise ranking accuracy (for logging).
+    """
+    advantages = torch.zeros(len(student_scores), device=student_scores.device)
+    accs = []
     for qid in query_ids.unique():
         mask = query_ids == qid
         idxs = mask.nonzero().squeeze(-1)
@@ -94,6 +100,11 @@ def grpo_reward(student_scores, teacher_scores, query_ids):
             continue
         s = student_scores[idxs]
         t = teacher_scores[idxs]
+
+        t_mean = t.mean()
+        t_std = t.std() + 1e-8
+        advantages[idxs] = (t - t_mean) / t_std
+
         correct = 0
         total = 0
         for i in range(n):
@@ -101,8 +112,10 @@ def grpo_reward(student_scores, teacher_scores, query_ids):
                 if (s[i] > s[j]) == (t[i] > t[j]):
                     correct += 1
                 total += 1
-        acc = correct / max(total, 1)
-        rewards[idxs] = acc
+        accs.append(correct / max(total, 1))
+
+    mean_acc = sum(accs) / len(accs) if accs else 0.0
+    return advantages, mean_acc
     return rewards
 
 
@@ -187,35 +200,30 @@ def main(
                 ref_logits = ref_model(input_ids=input_ids, attention_mask=attention_mask).logits.squeeze(-1)
                 ref_logits = torch.nan_to_num(ref_logits, nan=0.0, posinf=50.0, neginf=-50.0).clamp(-50, 50)
 
-            rewards = grpo_reward(student_logits, teacher_scores, query_ids)
-            rewards = torch.nan_to_num(rewards, nan=0.0)
-
-            r_mean = rewards.mean()
-            r_std = rewards.std() + 1e-8
-            normalized_rewards = (rewards - r_mean) / r_std
+            advantages, mean_acc = grpo_reward(student_logits, teacher_scores, query_ids)
+            advantages = torch.nan_to_num(advantages, nan=0.0)
 
             kl_div = F.mse_loss(student_logits.float(), ref_logits.float().detach())
 
-            pg_loss = -(normalized_rewards * student_logits.float()).mean()
+            pg_loss = -(advantages * student_logits.float()).mean()
             loss = pg_loss + beta * kl_div
 
             if torch.isnan(loss):
                 if accelerator.is_main_process:
-                    print(f"  NaN detected | pg_loss: {pg_loss.item():.4f} | kl: {kl_div.item():.4f} | "
-                          f"rewards: min={rewards.min().item():.4f} max={rewards.max().item():.4f} | "
-                          f"scores: min={student_logits.min().item():.4f} max={student_logits.max().item():.4f} | "
-                          f"n_scores: min={normalized_rewards.min().item():.4f} max={normalized_rewards.max().item():.4f}")
+                    print(f"  NaN detected | pg_loss: {pg_loss.item():.6f} | kl: {kl_div.item():.6f} | "
+                          f"adv: min={advantages.min().item():.4f} max={advantages.max().item():.4f} | "
+                          f"scores: min={student_logits.min().item():.4f} max={student_logits.max().item():.4f}")
                 loss = pg_loss  # fallback to just policy gradient
 
             accelerator.backward(loss)
-            if accelerator.sync_gradients:
-                accelerator.clip_grad_norm_(model.parameters(), 0.5)
+            grad_norm = accelerator.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
 
             if step % 50 == 0 and accelerator.is_main_process:
-                print(f"Step {step}/{total_steps} | Loss: {loss.item():.4f} | Reward: {r_mean.item():.4f} | KL: {kl_div.item():.4f}")
+                print(f"Step {step}/{total_steps} | Loss: {loss.item():.6f} | Acc: {mean_acc:.4f} | "
+                      f"KL: {kl_div.item():.6f} | GradNorm: {grad_norm.item():.4f}")
 
         ckpt_dir = os.path.join(output_dir, f"checkpoint-epoch-{epoch + 1}")
         accelerator.save_state(ckpt_dir)
