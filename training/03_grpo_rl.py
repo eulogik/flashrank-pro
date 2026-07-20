@@ -13,6 +13,9 @@ Colab T4: ~2h.
 
 import json
 import os
+
+os.environ["PEFT_USE_TORCHAO"] = "0"
+
 from typing import Optional
 
 import torch
