@@ -150,6 +150,8 @@ def score_with_teacher(
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = CrossEncoder(teacher_name, device=device)
+    if device == "cuda":
+        model.model.half()  # T4 is 5x faster in fp16
 
     all_pairs_list: list[tuple[str, str]] = []
     indices: list[int] = []
