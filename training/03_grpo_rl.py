@@ -132,6 +132,7 @@ def main(
     beta: float = 0.04,
     num_epochs: int = 1,
     max_length: int = 512,
+    max_steps: int = -1,
 ):
     accelerator = Accelerator()
 
@@ -192,7 +193,10 @@ def main(
         os.makedirs(output_dir, exist_ok=True)
         print(f"GRPO RL | Model: {model_path} | max_docs: {max_docs} | Beta: {beta}")
         print(f"Queries: {len(dataset)} | Groups/batch: {batch_size} | Total steps: {total_steps}")
+        if max_steps > 0:
+            print(f"Smoke mode: max_steps={max_steps}")
 
+    global_step = 0
     for epoch in range(resume_epoch, num_epochs):
         model.train()
         for step, batch in enumerate(tqdm(loader, desc=f"RL Epoch {epoch+1}")):
@@ -232,16 +236,24 @@ def main(
             scheduler.step()
             optimizer.zero_grad()
 
+            global_step += 1
             if step % 50 == 0 and accelerator.is_main_process:
-                print(f"Step {step}/{total_steps} | Loss: {loss.item():.6f} | Acc: {mean_acc:.4f} | "
+                print(f"Step {global_step}/{total_steps} | Loss: {loss.item():.6f} | Acc: {mean_acc:.4f} | "
                       f"KL: {kl_div.item():.6f} | GradNorm: {grad_norm.item():.4f}")
+            if 0 < max_steps <= global_step:
+                break
 
         ckpt_dir = os.path.join(output_dir, f"checkpoint-epoch-{epoch + 1}")
         accelerator.save_state(ckpt_dir)
         if accelerator.is_main_process:
             print(f"Checkpoint saved: {ckpt_dir}")
+        if 0 < max_steps <= global_step:
+            break
 
     accelerator.wait_for_everyone()
+    if max_steps > 0 and global_step < total_steps:
+        if accelerator.is_main_process:
+            print(f"Trimmed training to {global_step} steps (max_steps={max_steps})")
     if accelerator.is_main_process:
         unwrapped = accelerator.unwrap_model(model)
         unwrapped.save_pretrained(output_dir)

@@ -62,7 +62,15 @@ def merge_checkpoints_slerp(
     cumulative_weight = 0.0
 
     for i, (ckpt_path, w) in enumerate(zip(checkpoint_paths, weights)):
-        state = torch.load(os.path.join(ckpt_path, "pytorch_model.bin"), map_location="cpu", weights_only=True)
+        bin_path = os.path.join(ckpt_path, "pytorch_model.bin")
+        safetensors_path = os.path.join(ckpt_path, "model.safetensors")
+        if os.path.exists(bin_path):
+            state = torch.load(bin_path, map_location="cpu", weights_only=True)
+        elif os.path.exists(safetensors_path):
+            from safetensors.torch import load_file
+            state = load_file(safetensors_path)
+        else:
+            raise FileNotFoundError(f"No model weights found in {ckpt_path}")
         if i == 0:
             merged_state = {k: v.clone().float() for k, v in state.items()}
             cumulative_weight = w

@@ -130,6 +130,7 @@ def main(
     use_lora: bool = False,
     lora_r: int = 16,
     use_wandb: bool = False,
+    max_steps: int = -1,
 ):
     accelerator = Accelerator()
     device = accelerator.device
@@ -190,7 +191,10 @@ def main(
         os.makedirs(output_dir, exist_ok=True)
         print(f"Training {model_name} | Batch {batch_size} | LR {learning_rate} | Epochs {num_epochs}")
         print(f"Total steps: {total_steps} | Samples: {len(dataset)}")
+        if max_steps > 0:
+            print(f"Smoke mode: max_steps={max_steps}")
 
+    global_step = 0
     for epoch in range(start_epoch, num_epochs):
         model.train()
         total_loss = 0.0
@@ -204,8 +208,13 @@ def main(
             scheduler.step()
             optimizer.zero_grad()
             total_loss += loss.item()
+            global_step += 1
             if step % 100 == 0 and accelerator.is_main_process:
-                print(f"Step {step}/{total_steps} Loss: {loss.item():.4f}")
+                print(f"Step {global_step}/{total_steps} Loss: {loss.item():.4f}")
+            if 0 < max_steps <= global_step:
+                break
+        if 0 < max_steps <= global_step:
+            break
 
         avg_loss = total_loss / len(loader)
         if accelerator.is_main_process:
@@ -214,6 +223,9 @@ def main(
         save_checkpoint(accelerator, output_dir, epoch + 1)
 
     accelerator.wait_for_everyone()
+    if max_steps > 0 and global_step < total_steps:
+        if accelerator.is_main_process:
+            print(f"Trimmed training to {global_step} steps (max_steps={max_steps})")
     if accelerator.is_main_process:
         unwrapped = accelerator.unwrap_model(model)
         if any(torch.isnan(p).any() or torch.isinf(p).any() for p in unwrapped.parameters()):
