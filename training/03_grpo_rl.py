@@ -119,7 +119,6 @@ def grpo_reward(student_scores, teacher_scores, query_ids):
 
     mean_acc = sum(accs) / len(accs) if accs else 0.0
     return advantages, mean_acc
-    return rewards
 
 
 def main(
@@ -256,9 +255,10 @@ def main(
             print(f"Trimmed training to {global_step} steps (max_steps={max_steps})")
     if accelerator.is_main_process:
         unwrapped = accelerator.unwrap_model(model)
-        unwrapped.save_pretrained(output_dir)
+        merged = unwrapped.merge_and_unload()
+        merged.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
-        print(f"RL model saved to {output_dir}")
+        print(f"RL model saved to {output_dir} (LoRA merged into base)")
 
 
 if __name__ == "__main__":
