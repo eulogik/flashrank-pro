@@ -270,6 +270,9 @@ your-org/flashrank-pro-large
 cd /Users/gautamkishore/Code/reranker
 pip install -e .
 
+# Smoke test (validates all 4 stages with tiny data, ~5 min)
+python scripts/smoke_test.py
+
 # Stage 1: Generate data (run locally, no API key needed)
 python training/01_generate_synthetic_data.py --n_queries 50000
 
@@ -281,7 +284,7 @@ python training/02_knowledge_distillation.py \
 # Stage 3: GRPO RL (run on Colab T4)
 python training/03_grpo_rl.py \
     --model_path models/flashrank-pro-base-kd-en \
-    --batch_size 4 --k_samples 8
+    --batch_size 4
 
 # Stage 4: SLERP merge (run anywhere, CPU fine)
 python training/04_slerp_merge.py --config_path configs/slerp_config.json
@@ -303,10 +306,13 @@ bash scripts/train_full_pipeline.sh base
 
 ## 12. Common Pitfalls
 
-1. **T4 doesn't support bf16** — All scripts use `fp16`. If you see a bf16 error, set `torch_dtype=torch.float16`.
-2. **Colab session timeout** — Stages 2-3 each fit in one session. Save intermediate checkpoints to Google Drive between stages.
-3. **ModernBERT large OOM on T4** — Use LoRA (`--use_lora true`) for large. Base fits full FT with batch 8.
-4. **Teacher model CPU OOM** — `mxbai-rerank-large-v2` (1.5B) needs ~6GB. `Qwen3-Reranker-8B` needs ~16GB. Use the smaller teacher for local scoring.
-5. **OpenAI API rate limits** — Stage 1 generates queries using existing HF datasets (free). Only uses API if `--llm_endpoint` is explicitly passed.
-6. **SLERP merge path mismatch** — The pytorch_model.bin keys must match between checkpoints. Use the same base model config for all.
-7. **sentence-transformers CrossEncoder vs our model** — Our `Reranker` class is a thin wrapper. For MTEB/BEIR eval, we use `sentence-transformers.CrossEncoder(model_path)` because those frameworks expect it.
+1. **T4 doesn't support bf16** — All scripts now use `fp32` (was fp16). fp16 MSE loss silently produces NaN in gradients → corrupts saved weights. fp32 is slower but safe.
+2. **Stage 3 save_pretrained saves LoRA adapters, not full model** — `merge_and_unload()` must be called before `save_pretrained()` so Stage 4 SLERP merge gets full weight keys/shapes.
+3. **Stage 4 needs safetensors support** — Stages 2/3 save `model.safetensors`, not `pytorch_model.bin`. Stage 4 must handle both.
+4. **Notebook clone in Colab** — `https://token@github.com/repo.git` format conflicts with credential managers. Use Python `requests` to download zipball from GitHub API instead.
+5. **Colab session timeout** — Stages 2-3 each fit in one session. Save intermediate checkpoints to Google Drive between stages.
+6. **ModernBERT large OOM on T4** — Use LoRA (`--use_lora true`) for large. Base fits full FT with batch 8.
+7. **Teacher model CPU OOM** — `mxbai-rerank-large-v2` (1.5B) needs ~6GB. `Qwen3-Reranker-8B` needs ~16GB. Use the smaller teacher for local scoring.
+8. **OpenAI API rate limits** — Stage 1 generates queries using existing HF datasets (free). Only uses API if `--llm_endpoint` is explicitly passed.
+9. **SLERP merge path mismatch** — The pytorch_model.bin or model.safetensors keys must match between checkpoints. Use the same base model config for all.
+10. **sentence-transformers CrossEncoder vs our model** — Our `Reranker` class is a thin wrapper. For MTEB/BEIR eval, we use `sentence-transformers.CrossEncoder(model_path)` because those frameworks expect it.

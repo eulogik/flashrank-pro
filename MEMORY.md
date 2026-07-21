@@ -1,7 +1,52 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-07-20
+> Last updated: 2026-07-21
+
+---
+
+## Session 004 — Pipeline fixes + smoke test + GitHub API download
+
+**Date:** 2026-07-21
+
+### Debugging Saga
+- **Stage 2 fp16 → NaN corruption:** MSE loss in fp16 silently overflowed → saved weights had NaN → Stage 3 forward pass produced NaN at every step. Fix: fp32 throughout.
+- **Stage 3 NaN gradients:** Root cause was corrupted Stage 2 weights (above). Had NaN guards + fallbacks added as defense-in-depth.
+- **Stage 4 safetensors support:** Hardcoded `pytorch_model.bin` — but Stages 2/3 save `model.safetensors`. Fixed: try safetensors first, fallback to .bin.
+- **Stage 3 LoRA merge:** `save_pretrained` on PEFT model saved only `adapter_model.safetensors` (no base weights). Stage 4 SLERP merge would crash on key shape mismatch. Fix: `merge_and_unload()` before saving.
+- **Notebook clone hell:**
+  - URL-embedded token (`https://token@github.com/repo.git`) — some git versions conflict with credential managers → exit 128
+  - `http.extraheader=Authorization: Bearer` — libcurl strips custom headers on redirect → silent fail
+  - `GIT_ASKPASS` helper script — fragile quoting/escaping of shell script in JSON
+  - **Final solution:** Python `requests` → GitHub API zipball download. No git involved. Works every time.
+
+### Changes Made
+1. **`training/01_generate_synthetic_data.py`** — Added `math` import; teacher NaN/inf guard; output validation (score count, finite check, spread check)
+2. **`training/02_knowledge_distillation.py`** — fp32 (was fp16); `max_steps` param for smoke test; NaN-weight guard at load + save
+3. **`training/03_grpo_rl.py`** — fp32; `max_steps` param; `merge_and_unload()` before `save_pretrained` (so Stage 4 gets full weights); removed dead code
+4. **`training/04_slerp_merge.py`** — Load `model.safetensors` or `pytorch_model.bin`
+5. **`scripts/smoke_test.py`** — NEW: validates all 4 stages with tiny 8-query data, max_steps=2, batch_size=2. Runs in ~5 min on T4. Exits 0 on PASS.
+6. **`notebooks/FlashRank_Pro_Training.ipynb`**:
+   - `SMOKE_TEST = True/False` flag in setup — auto-runs smoke test before full pipeline
+   - Clone: changed from `git clone` to `requests` GitHub API zipball download (Bearer token, handles redirects, no git credential conflicts)
+   - `capture_output=False` everywhere (visible errors)
+   - Weight NaN verification after Stage 2 training
+   - Data spread check in Stage 1
+   - Re-run uses `.git` detection for `git pull` vs skip
+
+### How to run smoke test
+```bash
+cd /content/flashrank-pro
+pip install -e .
+python scripts/smoke_test.py
+```
+
+Or in notebook: set `SMOKE_TEST = True` in setup cell → Runtime → Run all.
+
+### State
+- All known pipeline bugs fixed
+- Full end-to-end run NOT yet completed (training time would take ~4h)
+- Last commit: `c1ec970`
 
 ---
 
