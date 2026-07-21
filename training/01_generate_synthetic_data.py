@@ -143,25 +143,35 @@ def mine_hard_negatives(
 def score_with_teacher(
     pairs: list[dict],
     teacher_name: str = "mixedbread-ai/mxbai-rerank-large-v2",
+    batch_size: int = 64,
 ) -> list[dict]:
     """Score pairs using a teacher reranker for distillation soft labels."""
     from sentence_transformers import CrossEncoder
 
-    model = CrossEncoder(teacher_name, device="cuda" if torch.cuda.is_available() else "cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = CrossEncoder(teacher_name, device=device)
 
-    for p in tqdm(pairs, desc="Scoring with teacher"):
+    all_pairs_list: list[tuple[str, str]] = []
+    indices: list[int] = []
+    for i, p in enumerate(pairs):
         docs = [p["positive"]] + p["negatives"]
-        pairs_list = [(p["query"], d) for d in docs]
-        scores = model.predict(pairs_list, show_progress_bar=False)
-        if scores.ndim == 2 and scores.shape[1] == 2:
-            scores = scores[:, -1]
-        scores = scores.tolist()
-        if isinstance(scores, float):
-            scores = [scores]
-        scores = [float(s) for s in scores]
+        for d in docs:
+            all_pairs_list.append((p["query"], d))
+            indices.append(i)
+
+    all_scores = model.predict(all_pairs_list, batch_size=batch_size, show_progress_bar=True)
+    if all_scores.ndim == 2 and all_scores.shape[1] == 2:
+        all_scores = all_scores[:, -1]
+    all_scores = [float(s) for s in all_scores]
+
+    doc_counts = [1 + len(p["negatives"]) for p in pairs]
+    pos = 0
+    for i, n in enumerate(doc_counts):
+        scores = all_scores[pos:pos + n]
         if any(math.isnan(s) or math.isinf(s) for s in scores):
-            raise RuntimeError(f"Teacher produced NaN/inf scores for query: {p['query'][:60]}")
-        p["teacher_scores"] = scores
+            raise RuntimeError(f"Teacher produced NaN/inf scores for query: {pairs[i]['query'][:60]}")
+        pairs[i]["teacher_scores"] = scores
+        pos += n
 
     return pairs
 

@@ -1,3 +1,5 @@
+import json
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -23,25 +25,50 @@ class FlashRankProConfig:
     lora_dropout: float = 0.1
 
 
+def _ensure_model_type(model_path: str) -> bool:
+    config_path = os.path.join(model_path, "config.json")
+    if not os.path.exists(config_path):
+        return False
+    with open(config_path) as f:
+        cfg = json.load(f)
+    if "model_type" not in cfg or not cfg["model_type"]:
+        cfg["model_type"] = "modernbert"
+        with open(config_path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        return True
+    return False
+
+
 class FlashRankPro(nn.Module):
-    def __init__(self, config: FlashRankProConfig):
+    def __init__(self, model_or_config):
         super().__init__()
-        self.config = config
+        if isinstance(model_or_config, FlashRankProConfig):
+            self.config = model_or_config
+            model_path = model_or_config.model_name
+            num_labels = model_or_config.num_labels
+            torch_dtype = getattr(torch, model_or_config.torch_dtype)
+            max_length = model_or_config.max_length
+        else:
+            model_path = model_or_config
+            num_labels = 1
+            torch_dtype = torch.float16
+            max_length = 8192
+            self.config = FlashRankProConfig(model_name=model_path)
+        _ensure_model_type(model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            config.model_name,
-            num_labels=config.num_labels,
-            torch_dtype=getattr(torch, config.torch_dtype),
+            model_path, num_labels=num_labels, torch_dtype=torch_dtype,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token or "[PAD]"
+        self.max_length = max_length
 
     def forward(self, query_doc_pairs):
         encoded = self.tokenizer(
             query_doc_pairs,
             padding=True,
             truncation=True,
-            max_length=self.config.max_length,
+            max_length=self.max_length,
             return_tensors="pt",
         ).to(self.model.device)
         outputs = self.model(**encoded)
@@ -63,7 +90,7 @@ class Reranker:
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = device
-        self.model = FlashRankPro(FlashRankProConfig(model_name=model_path))
+        self.model = FlashRankPro(model_path)
         self.model.to(device)
         self.model.eval()
 

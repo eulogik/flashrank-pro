@@ -88,6 +88,8 @@ def merge_checkpoints_slerp(
     tokenizer.save_pretrained(output_path)
 
     config = AutoModelForSequenceClassification.from_pretrained(checkpoint_paths[0]).config
+    if not getattr(config, "model_type", None):
+        config.model_type = "modernbert"
     config.save_pretrained(output_path)
 
     print(f"Merged model saved to {output_path}")
