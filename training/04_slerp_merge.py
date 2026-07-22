@@ -99,6 +99,10 @@ def main(
     config_path: str = "configs/slerp_config.json",
     output_path: str = "models/flashrank-pro-merged",
 ):
+    if os.path.exists(os.path.join(output_path, "model.safetensors")) or os.path.exists(os.path.join(output_path, "pytorch_model.bin")):
+        print(f"   ✅ {output_path} already exists — skipping Stage 4")
+        return
+
     with open(config_path) as f:
         config = json.load(f)
     merge_checkpoints_slerp(config["checkpoints"], config.get("weights"), output_path)

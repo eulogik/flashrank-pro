@@ -132,6 +132,10 @@ def main(
     use_wandb: bool = False,
     max_steps: int = -1,
 ):
+    if os.path.exists(os.path.join(output_dir, "model.safetensors")) or os.path.exists(os.path.join(output_dir, "pytorch_model.bin")):
+        print(f"   ✅ {output_dir} already exists — skipping Stage 2")
+        return
+
     accelerator = Accelerator()
     device = accelerator.device
 

@@ -133,6 +133,10 @@ def main(
     max_length: int = 512,
     max_steps: int = -1,
 ):
+    if os.path.exists(os.path.join(output_dir, "model.safetensors")) or os.path.exists(os.path.join(output_dir, "pytorch_model.bin")):
+        print(f"   ✅ {output_dir} already exists — skipping Stage 3")
+        return
+
     accelerator = Accelerator()
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)

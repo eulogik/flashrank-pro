@@ -205,6 +205,10 @@ def main(
                    OpenRouter free: meta-llama/llama-3.2-3b-instruct:free
                    OpenAI: gpt-4o-mini
     """
+    if os.path.exists(output_path):
+        print(f"   ✅ {output_path} already exists — skipping Stage 1")
+        return
+
     print(f"Loading corpus from {corpus_name}...")
     if llm_endpoint:
         dataset = load_dataset(corpus_name, split="train")
