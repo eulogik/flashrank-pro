@@ -144,36 +144,71 @@ def score_with_teacher(
     pairs: list[dict],
     teacher_name: str = "mixedbread-ai/mxbai-rerank-large-v2",
     batch_size: int = 64,
+    output_path: str = "data/synthetic_training_data.jsonl",
+    checkpoint_every: int = 1000,
 ) -> list[dict]:
     """Score pairs using a teacher reranker for distillation soft labels."""
     from sentence_transformers import CrossEncoder
 
+    ckpt_path = output_path + ".scored_ckpt"
+    already_scored = {}
+    if os.path.exists(ckpt_path):
+        with open(ckpt_path) as f:
+            for line in f:
+                rec = json.loads(line)
+                already_scored[rec["query"]] = rec["teacher_scores"]
+        print(f"   Resuming: {len(already_scored)} pairs already scored")
+
+    remaining = [p for p in pairs if p["query"] not in already_scored]
+    for p in remaining:
+        if p["query"] in already_scored:
+            p["teacher_scores"] = already_scored[p["query"]]
+
+    if not remaining:
+        print("   All pairs already scored")
+        return pairs
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = CrossEncoder(teacher_name, device=device)
     if device == "cuda":
-        model.model.half()  # T4 is 5x faster in fp16
+        model.model.half()
 
     all_pairs_list: list[tuple[str, str]] = []
-    indices: list[int] = []
-    for i, p in enumerate(pairs):
+    for p in remaining:
         docs = [p["positive"]] + p["negatives"]
         for d in docs:
             all_pairs_list.append((p["query"], d))
-            indices.append(i)
 
+    print(f"   Scoring {len(remaining)} pairs ({len(all_pairs_list)} forward passes)...")
     all_scores = model.predict(all_pairs_list, batch_size=batch_size, show_progress_bar=True)
     if all_scores.ndim == 2 and all_scores.shape[1] == 2:
         all_scores = all_scores[:, -1]
     all_scores = [float(s) for s in all_scores]
 
-    doc_counts = [1 + len(p["negatives"]) for p in pairs]
+    doc_counts = [1 + len(p["negatives"]) for p in remaining]
     pos = 0
+    saved = 0
+    ckpt_file = open(ckpt_path, "a")
     for i, n in enumerate(doc_counts):
         scores = all_scores[pos:pos + n]
         if any(math.isnan(s) or math.isinf(s) for s in scores):
-            raise RuntimeError(f"Teacher produced NaN/inf scores for query: {pairs[i]['query'][:60]}")
-        pairs[i]["teacher_scores"] = scores
+            raise RuntimeError(f"Teacher produced NaN/inf scores for query: {remaining[i]['query'][:60]}")
+        remaining[i]["teacher_scores"] = scores
         pos += n
+        saved += 1
+        if saved % checkpoint_every == 0:
+            ckpt_file.write(json.dumps(remaining[i]) + "\n")
+            ckpt_file.flush()
+    ckpt_file.close()
+
+    for p in remaining:
+        already_scored[p["query"]] = p["teacher_scores"]
+    for p in pairs:
+        if p["query"] in already_scored:
+            p["teacher_scores"] = already_scored[p["query"]]
+
+    if os.path.exists(ckpt_path):
+        os.remove(ckpt_path)
 
     return pairs
 
@@ -209,30 +244,47 @@ def main(
         print(f"   ✅ {output_path} already exists — skipping Stage 1")
         return
 
-    print(f"Loading corpus from {corpus_name}...")
-    if llm_endpoint:
-        dataset = load_dataset(corpus_name, split="train")
-        docs = dataset["answer"] if "answer" in dataset.column_names else dataset["text"]
-        print(f"    Generating {n_queries} synthetic queries via {llm_endpoint} ({llm_model})...")
-        queries = generate_queries_via_llm(
-            docs, n_queries=n_queries,
-            endpoint=llm_endpoint, model=llm_model,
-        )
-        corpus = docs
+    mined_ckpt = output_path + ".mined_ckpt"
+    if os.path.exists(mined_ckpt):
+        print(f"   Resuming from mined checkpoint...")
+        pairs = []
+        with open(mined_ckpt) as f:
+            for line in f:
+                pairs.append(json.loads(line))
+        print(f"   Loaded {len(pairs)} mined pairs from checkpoint")
     else:
-        queries, corpus = load_queries(corpus_name, n_queries=n_queries)
+        print(f"Loading corpus from {corpus_name}...")
+        if llm_endpoint:
+            dataset = load_dataset(corpus_name, split="train")
+            docs = dataset["answer"] if "answer" in dataset.column_names else dataset["text"]
+            print(f"    Generating {n_queries} synthetic queries via {llm_endpoint} ({llm_model})...")
+            queries = generate_queries_via_llm(
+                docs, n_queries=n_queries,
+                endpoint=llm_endpoint, model=llm_model,
+            )
+            corpus = docs
+        else:
+            queries, corpus = load_queries(corpus_name, n_queries=n_queries)
 
-    print(f"Mining {n_negatives} hard negatives per query...")
-    pairs = mine_hard_negatives(queries, corpus, n_negatives=n_negatives)
+        print(f"Mining {n_negatives} hard negatives per query...")
+        pairs = mine_hard_negatives(queries, corpus, n_negatives=n_negatives)
+
+        os.makedirs(os.path.dirname(mined_ckpt), exist_ok=True)
+        with open(mined_ckpt, "w") as f:
+            for p in pairs:
+                f.write(json.dumps(p) + "\n")
+        print(f"   Saved mined pairs checkpoint ({len(pairs)} pairs)")
 
     print("Scoring with teacher model...")
-    pairs = score_with_teacher(pairs)
+    pairs = score_with_teacher(pairs, output_path=output_path)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         for p in pairs:
             f.write(json.dumps(p) + "\n")
     print(f"Saved {len(pairs)} examples to {output_path}")
+    if os.path.exists(mined_ckpt):
+        os.remove(mined_ckpt)
     print(f"  Each example: query + positive + {n_negatives} negatives + teacher scores")
 
     sample = pairs[0]
