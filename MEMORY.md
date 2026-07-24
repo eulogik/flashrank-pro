@@ -1,7 +1,46 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-07-21
+> Last updated: 2026-07-22
+
+---
+
+## Session 005 — Notebook Drive sync + resume + teacher speed
+
+**Date:** 2026-07-22
+
+### Problems Fixed
+1. **Teacher scoring was per-example (50K calls)** → batched into single `model.predict(all_pairs_list)` call. 1 call vs 50K.
+2. **Teacher scoring in fp32** → added `model.model.half()` for CUDA. ~5-10x faster on T4 (21s/batch → 2.1s/batch).
+3. **No incremental checkpoints** → Stage 1 now saves `.mined_ckpt` (after mining) and `.scored_ckpt` (every 1000 pairs) to resume on timeout.
+4. **Notebook didn't save to Drive** → Stage 1 now writes directly to `DRIVE_ROOT/data/` path. Checkpoints go to Drive too.
+5. **Notebook restore skipped if local existed** → now always force-overwrites local from Drive.
+6. **Stage 2 indentation bug** → `print()` broke out of `else` block, `cmd` went back in → SyntaxError.
+7. **Config model_type missing** → `_ensure_model_type()` patches `config.json` on disk. Stage 4 also sets model_type before saving.
+8. **FlashRankPro accepted only FlashRankProConfig** → now accepts string path directly. Cleaner API.
+9. **LoRA adapter vs full model** → Stage 3 now calls `merge_and_unload()` before `save_pretrained()`.
+10. **Stage 4 only loaded pytorch_model.bin** → now handles safetensors too.
+
+### What Changed This Session
+- `training/01_generate_synthetic_data.py` — batched teacher scoring, fp16, incremental checkpoints, Drive output path
+- `training/04_slerp_merge.py` — config model_type guard, safetensors support
+- `flashrank_pro/model.py` — `_ensure_model_type()`, accepts string path, exports FlashRankPro
+- `flashrank_pro/__init__.py` — exports FlashRankPro
+- `notebooks/FlashRank_Pro_Training.ipynb` — complete rewrite for Drive-direct writes, fixed Stage2 indentation, force-restore
+
+### Colab Timing (T4)
+| Step | Time |
+|------|------|
+| Hard negative mining (50K) | ~32 min |
+| Teacher scoring (250K pairs, fp16, batched) | ~2.3h |
+| Stage 2 KD (base, fp32) | ~3h |
+| Stage 3 GRPO RL (LoRA, fp32) | ~1-2h |
+| Stage 4 SLERP merge | ~5 min |
+
+### State
+- Stage 1 (data generation) running in Colab — needs to complete (~2.5h total)
+- User has Colab Free tier — session timeouts are the main enemy
+- Incremental checkpoints + Drive writes ensure resume works
 
 ---
 
