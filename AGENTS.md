@@ -310,9 +310,14 @@ bash scripts/train_full_pipeline.sh base
 2. **Stage 3 save_pretrained saves LoRA adapters, not full model** — `merge_and_unload()` must be called before `save_pretrained()` so Stage 4 SLERP merge gets full weight keys/shapes.
 3. **Stage 4 needs safetensors support** — Stages 2/3 save `model.safetensors`, not `pytorch_model.bin`. Stage 4 must handle both.
 4. **Notebook clone in Colab** — `https://token@github.com/repo.git` format conflicts with credential managers. Use Python `requests` to download zipball from GitHub API instead.
-5. **Colab session timeout** — Stages 2-3 each fit in one session. Save intermediate checkpoints to Google Drive between stages.
+5. **Colab session timeout** — Stages 2-3 each fit in one session. Stage 1 (data gen) takes ~2.5h — use incremental checkpoints + Drive writes.
 6. **ModernBERT large OOM on T4** — Use LoRA (`--use_lora true`) for large. Base fits full FT with batch 8.
 7. **Teacher model CPU OOM** — `mxbai-rerank-large-v2` (1.5B) needs ~6GB. `Qwen3-Reranker-8B` needs ~16GB. Use the smaller teacher for local scoring.
 8. **OpenAI API rate limits** — Stage 1 generates queries using existing HF datasets (free). Only uses API if `--llm_endpoint` is explicitly passed.
 9. **SLERP merge path mismatch** — The pytorch_model.bin or model.safetensors keys must match between checkpoints. Use the same base model config for all.
 10. **sentence-transformers CrossEncoder vs our model** — Our `Reranker` class is a thin wrapper. For MTEB/BEIR eval, we use `sentence-transformers.CrossEncoder(model_path)` because those frameworks expect it.
+11. **Teacher scoring is slow per-example** — `CrossEncoder.predict()` called per-query (50K calls) → 14h on T4. Fix: collect ALL pairs into one list, single `predict()` call. Batch 64 on T4 with fp16 (`model.model.half()`).
+12. **Notebook writes to local, not Drive** — If notebook writes to `/content/...` and only copies to Drive after completion, checkpoints are lost on session break. Fix: Stage 1 writes directly to Drive path.
+13. **Notebook restore must always overwrite** — If local `data/` exists from a failed run, the restore logic skips Drive→local copy. Stale local data = wrong state. Fix: always delete local and copy from Drive.
+14. **Config model_type missing in merged model** — `AutoModelForSequenceClassification.from_pretrained` fails if `config.json` lacks `model_type`. Fix: `_ensure_model_type()` patches config on disk before loading.
+15. **MPS crashes on Qwen2-based models** — `mxbai-rerank-*` uses Qwen2 architecture which has MPS matmul bugs. Cannot run teacher on Mac GPU. Use CPU or Colab T4.
