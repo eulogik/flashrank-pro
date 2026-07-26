@@ -97,22 +97,25 @@ def hybrid_distillation_loss(student_logits, teacher_scores, n_negs, margin_beta
     return pointwise_loss + margin_beta * margin_loss
 
 
-def find_latest_checkpoint(output_dir: str) -> Optional[int]:
-    """Find the latest completed epoch checkpoint."""
+def find_latest_checkpoint(output_dir: str) -> tuple[Optional[str], int]:
+    """Find the latest checkpoint (step or epoch). Returns (prefix, number)."""
     if not os.path.exists(output_dir):
-        return None
-    epochs = []
+        return None, 0
+    best_type, best_num = None, 0
     for d in os.listdir(output_dir):
-        if d.startswith("checkpoint-epoch-"):
-            try:
-                epochs.append(int(d.split("-")[-1]))
-            except ValueError:
-                pass
-    return max(epochs) if epochs else None
+        for prefix in ["checkpoint-step-", "checkpoint-epoch-"]:
+            if d.startswith(prefix):
+                try:
+                    num = int(d[len(prefix):])
+                    if num > best_num:
+                        best_type, best_num = prefix.rstrip("-"), num
+                except ValueError:
+                    pass
+    return best_type, best_num
 
 
-def save_checkpoint(accelerator, output_dir, epoch):
-    ckpt_dir = os.path.join(output_dir, f"checkpoint-epoch-{epoch}")
+def save_checkpoint(accelerator, output_dir, kind: str, num: int):
+    ckpt_dir = os.path.join(output_dir, f"checkpoint-{kind}-{num}")
     accelerator.save_state(ckpt_dir)
     if accelerator.is_main_process:
         print(f"Checkpoint saved: {ckpt_dir}")
@@ -131,6 +134,7 @@ def main(
     lora_r: int = 16,
     use_wandb: bool = False,
     max_steps: int = -1,
+    checkpoint_steps: int = 1000,
 ):
     if os.path.exists(os.path.join(output_dir, "model.safetensors")) or os.path.exists(os.path.join(output_dir, "pytorch_model.bin")):
         print(f"   ✅ {output_dir} already exists — skipping Stage 2")
@@ -178,14 +182,20 @@ def main(
 
     model, optimizer, loader, scheduler = accelerator.prepare(model, optimizer, loader, scheduler)
 
-    resume_epoch = find_latest_checkpoint(output_dir)
+    ckpt_type, ckpt_num = find_latest_checkpoint(output_dir)
     start_epoch = 0
-    if resume_epoch is not None:
-        ckpt = os.path.join(output_dir, f"checkpoint-epoch-{resume_epoch}")
-        accelerator.load_state(ckpt)
-        start_epoch = resume_epoch
+    global_step = 0
+    if ckpt_type is not None:
+        ckpt_dir = os.path.join(output_dir, f"{ckpt_type}-{ckpt_num}")
+        accelerator.load_state(ckpt_dir)
+        if ckpt_type == "checkpoint-epoch":
+            start_epoch = ckpt_num
+            global_step = ckpt_num * len(loader)
+        elif ckpt_type == "checkpoint-step":
+            global_step = ckpt_num
+            start_epoch = ckpt_num // len(loader)
         if accelerator.is_main_process:
-            print(f"Resumed from epoch {resume_epoch} checkpoint ({ckpt})")
+            print(f"Resumed from {ckpt_type} {ckpt_num} ({ckpt_dir}) [step {global_step}]")
 
     bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
     if bad and accelerator.is_main_process:
@@ -198,11 +208,14 @@ def main(
         if max_steps > 0:
             print(f"Smoke mode: max_steps={max_steps}")
 
-    global_step = 0
     for epoch in range(start_epoch, num_epochs):
         model.train()
         total_loss = 0.0
+        steps_in_epoch = 0
         for step, batch in enumerate(tqdm(loader, desc=f"Epoch {epoch+1}/{num_epochs}")):
+            if epoch == start_epoch and steps_in_epoch < global_step - start_epoch * len(loader):
+                steps_in_epoch += 1
+                continue
             logits = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]).logits.squeeze(-1)
             loss = hybrid_distillation_loss(logits, batch["teacher_scores"], batch["n_negs"], margin_beta)
             accelerator.backward(loss)
@@ -213,18 +226,21 @@ def main(
             optimizer.zero_grad()
             total_loss += loss.item()
             global_step += 1
-            if step % 100 == 0 and accelerator.is_main_process:
+            steps_in_epoch += 1
+            if global_step % checkpoint_steps == 0:
+                save_checkpoint(accelerator, output_dir, "step", global_step)
+            if global_step % 100 == 0 and accelerator.is_main_process:
                 print(f"Step {global_step}/{total_steps} Loss: {loss.item():.4f}")
             if 0 < max_steps <= global_step:
                 break
         if 0 < max_steps <= global_step:
             break
 
-        avg_loss = total_loss / len(loader)
+        avg_loss = total_loss / steps_in_epoch if steps_in_epoch else 0.0
         if accelerator.is_main_process:
             print(f"Epoch {epoch+1} avg loss: {avg_loss:.4f}")
 
-        save_checkpoint(accelerator, output_dir, epoch + 1)
+        save_checkpoint(accelerator, output_dir, "epoch", epoch + 1)
 
     accelerator.wait_for_everyone()
     if max_steps > 0 and global_step < total_steps:
