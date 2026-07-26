@@ -119,6 +119,8 @@ def mine_hard_negatives(
     corpus: list[str],
     n_negatives: int = 4,
     model_name: str = "sentence-transformers/static-retrieval-mrl-en-v1",
+    mined_ckpt: str | None = None,
+    checkpoint_every: int = 1000,
 ) -> list[dict]:
     """Mine hard negatives using an efficient embedding model (CPU)."""
     embedder = SentenceTransformer(model_name, device="cpu")
@@ -127,15 +129,47 @@ def mine_hard_negatives(
     q_embs = embedder.encode(q_texts, show_progress_bar=True, normalize_embeddings=True)
     c_embs = embedder.encode(corpus, show_progress_bar=True, normalize_embeddings=True)
 
+    q_to_emb = dict(zip(q_texts, q_embs))
+
+    done_queries = set()
     pairs = []
-    for i, (q, pos) in enumerate(tqdm(list(queries.items()), desc="Mining negatives")):
-        sims = q_embs[i] @ c_embs.T
+    if mined_ckpt and os.path.exists(mined_ckpt):
+        with open(mined_ckpt) as f:
+            for line in f:
+                rec = json.loads(line)
+                pairs.append(rec)
+                done_queries.add(rec["query"])
+        print(f"   Resuming mining: {len(pairs)} pairs done")
+
+    if len(pairs) >= len(queries):
+        print(f"   All {len(queries)} queries already mined — done")
+        return pairs
+
+    ckpt_file = None
+    if mined_ckpt:
+        os.makedirs(os.path.dirname(mined_ckpt), exist_ok=True)
+        ckpt_file = open(mined_ckpt, "a")
+    saved = len(pairs)
+
+    for q, pos in tqdm(list(queries.items()), desc="Mining negatives"):
+        if q in done_queries:
+            continue
+        emb = q_to_emb[q]
+        sims = emb @ c_embs.T
         ranked = np.argsort(-sims)
         negs = []
         for idx in ranked:
             if corpus[idx] != pos and len(negs) < n_negatives:
                 negs.append(corpus[idx])
-        pairs.append({"query": q, "positive": pos, "negatives": negs})
+        record = {"query": q, "positive": pos, "negatives": negs}
+        pairs.append(record)
+        saved += 1
+        if ckpt_file and saved % checkpoint_every == 0:
+            ckpt_file.write(json.dumps(record) + "\n")
+            ckpt_file.flush()
+
+    if ckpt_file:
+        ckpt_file.close()
 
     return pairs
 
@@ -245,13 +279,14 @@ def main(
         return
 
     mined_ckpt = output_path + ".mined_ckpt"
-    if os.path.exists(mined_ckpt):
-        print(f"   Resuming from mined checkpoint...")
+    mined_done = output_path + ".mined_done"
+    if os.path.exists(mined_done):
+        print(f"   Loading mined pairs from checkpoint...")
         pairs = []
         with open(mined_ckpt) as f:
             for line in f:
                 pairs.append(json.loads(line))
-        print(f"   Loaded {len(pairs)} mined pairs from checkpoint")
+        print(f"   Loaded {len(pairs)} mined pairs")
     else:
         print(f"Loading corpus from {corpus_name}...")
         if llm_endpoint:
@@ -267,13 +302,9 @@ def main(
             queries, corpus = load_queries(corpus_name, n_queries=n_queries)
 
         print(f"Mining {n_negatives} hard negatives per query...")
-        pairs = mine_hard_negatives(queries, corpus, n_negatives=n_negatives)
-
-        os.makedirs(os.path.dirname(mined_ckpt), exist_ok=True)
-        with open(mined_ckpt, "w") as f:
-            for p in pairs:
-                f.write(json.dumps(p) + "\n")
-        print(f"   Saved mined pairs checkpoint ({len(pairs)} pairs)")
+        pairs = mine_hard_negatives(queries, corpus, n_negatives=n_negatives, mined_ckpt=mined_ckpt)
+        with open(mined_done, "w") as f:
+            f.write("done\n")
 
     print("Scoring with teacher model...")
     pairs = score_with_teacher(pairs, output_path=output_path)
@@ -283,8 +314,9 @@ def main(
         for p in pairs:
             f.write(json.dumps(p) + "\n")
     print(f"Saved {len(pairs)} examples to {output_path}")
-    if os.path.exists(mined_ckpt):
-        os.remove(mined_ckpt)
+    for f in [mined_ckpt, mined_done]:
+        if os.path.exists(f):
+            os.remove(f)
     print(f"  Each example: query + positive + {n_negatives} negatives + teacher scores")
 
     sample = pairs[0]
