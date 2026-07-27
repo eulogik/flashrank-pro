@@ -123,6 +123,7 @@ def grpo_reward(student_scores, teacher_scores, query_ids):
 
 def main(
     model_path: str = "models/flashrank-pro-base",
+    model_name: str = "answerdotai/ModernBERT-base",
     data_path: str = "data/synthetic_training_data.jsonl",
     output_dir: str = "models/flashrank-pro-base-rl",
     learning_rate: float = 1e-4,
@@ -139,7 +140,11 @@ def main(
 
     accelerator = Accelerator()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+    except Exception:
+        accelerator.print(f"Local tokenizer not found at {model_path}, loading from {model_name}")
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
