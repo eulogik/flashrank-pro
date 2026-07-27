@@ -22,6 +22,21 @@ from accelerate import Accelerator
 from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+def _ensure_model_type(model_path: str) -> bool:
+    config_path = os.path.join(model_path, "config.json")
+    if not os.path.exists(config_path):
+        return False
+    with open(config_path) as f:
+        cfg = json.load(f)
+    if "model_type" not in cfg or not cfg["model_type"]:
+        cfg["model_type"] = "modernbert"
+        with open(config_path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        print(f"   Patched model_type in {config_path}")
+        return True
+    return False
+
+
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -252,6 +267,7 @@ def main(
             print("ERROR: Final model has NaN/inf weights — NOT saving. Check loss/inputs.")
         else:
             unwrapped.save_pretrained(output_dir)
+            _ensure_model_type(output_dir)
         tokenizer.save_pretrained(output_dir)
         print(f"Model saved to {output_dir}")
 
