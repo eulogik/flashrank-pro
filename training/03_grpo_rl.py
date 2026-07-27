@@ -21,25 +21,10 @@ from accelerate import Accelerator
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import ModernBertConfig
 from peft import LoraConfig, get_peft_model
 import peft.tuners.lora.torchao
 peft.tuners.lora.torchao.is_torchao_available = lambda: False
-
-
-def _ensure_model_type(model_path: str) -> bool:
-    """Patch config.json if model_type is missing."""
-    config_path = os.path.join(model_path, "config.json")
-    if not os.path.exists(config_path):
-        return False
-    with open(config_path) as f:
-        cfg = json.load(f)
-    if "model_type" not in cfg or not cfg["model_type"]:
-        cfg["model_type"] = "modernbert"
-        with open(config_path, "w") as f:
-            json.dump(cfg, f, indent=2)
-        print(f"   Patched model_type in {config_path}")
-        return True
-    return False
 
 
 class RLDataset(Dataset):
@@ -164,8 +149,9 @@ def main(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or "[PAD]"
 
-    _ensure_model_type(model_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels=1, torch_dtype=torch.float32)
+    config = ModernBertConfig.from_pretrained(model_path)
+    config.num_labels = 1
+    model = AutoModelForSequenceClassification.from_pretrained(model_path, config=config, torch_dtype=torch.float32)
     bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
     if bad and accelerator.is_main_process:
         print(f"FATAL: {len(bad)} params in checkpoint contain NaN/inf (e.g. {bad[:3]}). "
