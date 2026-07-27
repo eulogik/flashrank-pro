@@ -211,6 +211,12 @@ def main(
             start_epoch = ckpt_num // len(loader)
         if accelerator.is_main_process:
             print(f"Resumed from {ckpt_type} {ckpt_num} ({ckpt_dir}) [step {global_step}]")
+            if not os.path.exists(os.path.join(output_dir, "model.safetensors")):
+                unwrapped = accelerator.unwrap_model(model)
+                unwrapped.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
+                _ensure_model_type(output_dir)
+                print(f"   Saved checkpoint model to {output_dir}")
 
     bad = [n for n, p in model.named_parameters() if torch.isnan(p).any() or torch.isinf(p).any()]
     if bad and accelerator.is_main_process:

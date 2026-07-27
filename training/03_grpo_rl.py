@@ -27,6 +27,57 @@ import peft.tuners.lora.torchao
 peft.tuners.lora.torchao.is_torchao_available = lambda: False
 
 
+def _ensure_model_type(model_path: str) -> None:
+    config_path = os.path.join(model_path, "config.json")
+    if os.path.exists(config_path):
+        with open(config_path) as f:
+            cfg = json.load(f)
+        if "model_type" not in cfg or not cfg["model_type"]:
+            cfg["model_type"] = "modernbert"
+            with open(config_path, "w") as f:
+                json.dump(cfg, f, indent=2)
+
+
+def find_latest_checkpoint(output_dir: str) -> tuple[Optional[str], int]:
+    if not os.path.exists(output_dir):
+        return None, 0
+    best_type, best_num = None, 0
+    for d in os.listdir(output_dir):
+        for prefix in ["checkpoint-step-", "checkpoint-epoch-"]:
+            if d.startswith(prefix):
+                try:
+                    num = int(d[len(prefix):])
+                    if num > best_num:
+                        best_type, best_num = prefix.rstrip("-"), num
+                except ValueError:
+                    pass
+    return best_type, best_num
+
+
+def restore_from_checkpoint(model_path: str, model_name: str) -> None:
+    """If top-level model weights are missing, restore from latest checkpoint."""
+    if os.path.exists(os.path.join(model_path, "model.safetensors")) or \
+       os.path.exists(os.path.join(model_path, "pytorch_model.bin")):
+        return
+    ckpt_type, ckpt_num = find_latest_checkpoint(model_path)
+    if ckpt_type is None:
+        raise FileNotFoundError(f"No model or checkpoint found at {model_path}")
+    ckpt_dir = os.path.join(model_path, f"{ckpt_type}-{ckpt_num}")
+    print(f"Restoring model from checkpoint {ckpt_dir} ...")
+    acc = Accelerator()
+    config = ModernBertConfig.from_pretrained(model_path)
+    config.num_labels = 1
+    model = AutoModelForSequenceClassification.from_pretrained(model_name, config=config, torch_dtype=torch.float32)
+    model = acc.prepare(model)
+    acc.load_state(ckpt_dir)
+    unwrapped = acc.unwrap_model(model)
+    unwrapped.save_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.save_pretrained(model_path)
+    _ensure_model_type(model_path)
+    print(f"Restored model to {model_path}")
+
+
 class RLDataset(Dataset):
     """Each sample = one query with all its docs (positive + negatives).
 
@@ -140,6 +191,8 @@ def main(
         return
 
     accelerator = Accelerator()
+
+    restore_from_checkpoint(model_path, model_name)
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_path)
