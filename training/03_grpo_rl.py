@@ -61,7 +61,9 @@ def restore_from_checkpoint(model_path: str, model_name: str) -> None:
         return
     ckpt_type, ckpt_num = find_latest_checkpoint(model_path)
     if ckpt_type is None:
-        raise FileNotFoundError(f"No model or checkpoint found at {model_path}")
+        print(f"Stage 2 output at {model_path} has no trained model or checkpoints.")
+        print("Run Stage 2 first (needs at least one epoch checkpoint before Stage 3).")
+        raise SystemExit(1)
     ckpt_dir = os.path.join(model_path, f"{ckpt_type}-{ckpt_num}")
     print(f"Restoring model from checkpoint {ckpt_dir} ...")
     acc = Accelerator()
