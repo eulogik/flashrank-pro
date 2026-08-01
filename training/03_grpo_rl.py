@@ -189,8 +189,8 @@ def main(
     max_steps: int = -1,
     checkpoint_steps: int = 1000,
 ):
-    if os.path.exists(os.path.join(output_dir, "model.safetensors")) or os.path.exists(os.path.join(output_dir, "pytorch_model.bin")):
-        print(f"   ✅ {output_dir} already exists — skipping Stage 3")
+    if os.path.exists(os.path.join(output_dir, "training_complete")):
+        print(f"   ✅ {output_dir} already complete — skipping Stage 3")
         return
 
     accelerator = Accelerator()
@@ -339,6 +339,8 @@ def main(
         merged = unwrapped.merge_and_unload()
         merged.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
+        with open(os.path.join(output_dir, "training_complete"), "w") as f:
+            f.write("done\n")
         print(f"RL model saved to {output_dir} (LoRA merged into base)")
 
 
