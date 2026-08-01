@@ -187,6 +187,7 @@ def main(
     num_epochs: int = 1,
     max_length: int = 512,
     max_steps: int = -1,
+    checkpoint_steps: int = 1000,
 ):
     if os.path.exists(os.path.join(output_dir, "model.safetensors")) or os.path.exists(os.path.join(output_dir, "pytorch_model.bin")):
         print(f"   ✅ {output_dir} already exists — skipping Stage 3")
@@ -242,18 +243,25 @@ def main(
     model, ref_model, optimizer, loader, scheduler = accelerator.prepare(model, ref_model, optimizer, loader, scheduler)
 
     resume_epoch = 0
-    if os.path.exists(output_dir):
-        for d in os.listdir(output_dir):
-            if d.startswith("checkpoint-epoch-"):
-                try:
-                    resume_epoch = max(resume_epoch, int(d.split("-")[-1]))
-                except ValueError:
-                    pass
-        if resume_epoch > 0:
-            ckpt = os.path.join(output_dir, f"checkpoint-epoch-{resume_epoch}")
-            accelerator.load_state(ckpt)
-            if accelerator.is_main_process:
-                print(f"Resumed from epoch {resume_epoch} ({ckpt})")
+    global_step = 0
+    ckpt_type, ckpt_num = find_latest_checkpoint(output_dir)
+    if ckpt_type is not None:
+        ckpt_dir = os.path.join(output_dir, f"{ckpt_type}-{ckpt_num}")
+        accelerator.load_state(ckpt_dir)
+        if ckpt_type == "checkpoint-epoch":
+            resume_epoch = ckpt_num
+            global_step = ckpt_num * len(loader)
+        elif ckpt_type == "checkpoint-step":
+            global_step = ckpt_num
+            resume_epoch = ckpt_num // len(loader)
+        if accelerator.is_main_process:
+            print(f"Resumed from {ckpt_type} {ckpt_num} ({ckpt_dir}) [step {global_step}]")
+            if not os.path.exists(os.path.join(output_dir, "model.safetensors")):
+                unwrapped = accelerator.unwrap_model(model)
+                merged = unwrapped.merge_and_unload()
+                merged.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
+                print(f"   Saved checkpoint model to {output_dir}")
 
     if accelerator.is_main_process:
         os.makedirs(output_dir, exist_ok=True)
@@ -262,10 +270,11 @@ def main(
         if max_steps > 0:
             print(f"Smoke mode: max_steps={max_steps}")
 
-    global_step = 0
     for epoch in range(resume_epoch, num_epochs):
         model.train()
         for step, batch in enumerate(tqdm(loader, desc=f"RL Epoch {epoch+1}")):
+            if epoch == resume_epoch and step < global_step - resume_epoch * len(loader):
+                continue
             input_ids = batch["input_ids"]
             attention_mask = batch["attention_mask"]
             teacher_scores = batch["teacher_scores"].to(accelerator.device)
@@ -303,6 +312,11 @@ def main(
             optimizer.zero_grad()
 
             global_step += 1
+            if global_step % checkpoint_steps == 0:
+                ckpt_dir = os.path.join(output_dir, f"checkpoint-step-{global_step}")
+                accelerator.save_state(ckpt_dir)
+                if accelerator.is_main_process:
+                    print(f"Checkpoint saved: {ckpt_dir}")
             if step % 50 == 0 and accelerator.is_main_process:
                 print(f"Step {global_step}/{total_steps} | Loss: {loss.item():.6f} | Acc: {mean_acc:.4f} | "
                       f"KL: {kl_div.item():.6f} | GradNorm: {grad_norm.item():.4f}")

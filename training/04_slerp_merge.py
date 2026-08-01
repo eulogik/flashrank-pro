@@ -70,6 +70,10 @@ def merge_checkpoints_slerp(
             from safetensors.torch import load_file
             state = load_file(safetensors_path)
         else:
+            ckpts = [d for d in os.listdir(ckpt_path) if d.startswith("checkpoint-")]
+            if ckpts:
+                print(f"Stage 4 needs merged weights but {ckpt_path} only has checkpoints: {sorted(ckpts)[-3:]}")
+                print(f"Re-run Stage 3 — it will restore from checkpoint and save merged weights to top level.")
             raise FileNotFoundError(f"No model weights found in {ckpt_path}")
         if i == 0:
             merged_state = {k: v.clone().float() for k, v in state.items()}
