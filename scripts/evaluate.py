@@ -63,13 +63,33 @@ BENCHMARK_DATASETS = {
 }
 
 
+def tfidf_retrieve(corpus: dict, queries: dict, top_k: int = 100):
+    """Simple TF-IDF retrieval as BM25 substitute."""
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    doc_ids = list(corpus.keys())
+    doc_texts = [corpus[did]["text"] for did in doc_ids]
+
+    vectorizer = TfidfVectorizer(stop_words="english", max_features=10000)
+    doc_vectors = vectorizer.fit_transform(doc_texts)
+
+    results = {}
+    for qid, query in queries.items():
+        q_vec = vectorizer.transform([query])
+        sims = cosine_similarity(q_vec, doc_vectors).flatten()
+        top_idx = np.argsort(-sims)[:top_k]
+        results[qid] = {doc_ids[i]: float(sims[i]) for i in top_idx}
+
+    return results
+
+
 def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100):
-    """Evaluate on BEIR benchmark datasets using BM25 + reranker."""
+    """Evaluate on BEIR benchmark datasets using TF-IDF + reranker."""
     try:
-        from beir import util, LoggingHandler
+        from beir import util
         from beir.datasets.data_loader import GenericDataLoader
         from beir.retrieval.evaluation import EvaluateRetrieval
-        from beir.retrieval.search.lexical import BM25Search as BM25
     except ImportError:
         print("BEIR library not installed. Install with: pip install beir")
         return {}
@@ -77,8 +97,6 @@ def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100)
     if datasets is None:
         datasets = BENCHMARK_DATASETS["beir"]
 
-    # Fixed tokenizer_config.json (changed tokenizer_class to BertTokenizerFast)
-    # This allows AutoTokenizer to load correctly
     reranker = CrossEncoder(model_path, max_length=512, trust_remote_code=True)
 
     results = {}
@@ -93,14 +111,12 @@ def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100)
             util.download_and_unzip(url, "data/beir")
             corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split="test")
 
-        bm25 = BM25(index_name=dataset_name, hostname="localhost", initialize=True)
-        bm25_retriever = EvaluateRetrieval(bm25, k_values=[top_k])
-        bm25_results = bm25_retriever.retrieve(corpus, queries)
+        tfidf_results = tfidf_retrieve(corpus, queries, top_k=top_k)
 
         reranked = {}
         for qid in tqdm(queries, desc=f"Reranking {dataset_name}"):
             query = queries[qid]
-            doc_ids = list(bm25_results[qid].keys())[:top_k]
+            doc_ids = list(tfidf_results[qid].keys())[:top_k]
             docs = [corpus[doc_id]["text"] for doc_id in doc_ids]
             if not docs:
                 reranked[qid] = {}
@@ -126,8 +142,7 @@ def evaluate_mteb_reranking(model_path: str, datasets: list[str] = None):
         return {}
 
     tasks = mteb.get_tasks(tasks=datasets or BENCHMARK_DATASETS["mteb_reranking"])
-    tokenizer = load_tokenizer(model_path)
-    model = CrossEncoder(model_path, max_length=512, tokenizer=tokenizer)
+    model = CrossEncoder(model_path, max_length=512, trust_remote_code=True)
     evaluation = mteb.MTEB(tasks=tasks)
     results = evaluation.run(model, output_folder="results/mteb")
     return results
