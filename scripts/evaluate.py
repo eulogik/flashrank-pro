@@ -13,8 +13,43 @@ from typing import Optional
 
 import numpy as np
 import torch
-from sentence_transformers import SentenceTransformer, CrossEncoder
+from sentence_transformers import CrossEncoder
 from tqdm import tqdm
+from tokenizers import Tokenizer
+from transformers import PreTrainedTokenizerFast
+
+
+def load_tokenizer(model_path: str) -> PreTrainedTokenizerFast:
+    """Load tokenizer directly from tokenizer.json to avoid tokenizer_class issues."""
+    # Try local path first, then HF hub cache
+    tok_path = None
+    if os.path.exists(os.path.join(model_path, "tokenizer.json")):
+        tok_path = os.path.join(model_path, "tokenizer.json")
+    else:
+        # Try HF hub cache
+        import glob
+        cache_pattern = os.path.expanduser(
+            f"~/.cache/huggingface/hub/models--{model_path.replace('/', '--')}/snapshots/*/tokenizer.json"
+        )
+        matches = glob.glob(cache_pattern)
+        if matches:
+            tok_path = matches[0]
+    
+    if not tok_path or not os.path.exists(tok_path):
+        raise FileNotFoundError(f"tokenizer.json not found for {model_path}")
+    
+    tok = Tokenizer.from_file(tok_path)
+    return PreTrainedTokenizerFast(
+        tokenizer_object=tok,
+        cls_token="[CLS]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        unk_token="[UNK]",
+        mask_token="[MASK]",
+        model_max_length=8192,
+        padding_side="right",
+        truncation_side="right",
+    )
 
 
 BENCHMARK_DATASETS = {
@@ -42,7 +77,9 @@ def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100)
     if datasets is None:
         datasets = BENCHMARK_DATASETS["beir"]
 
-    reranker = CrossEncoder(model_path, max_length=512)
+    # Fixed tokenizer_config.json (changed tokenizer_class to BertTokenizerFast)
+    # This allows AutoTokenizer to load correctly
+    reranker = CrossEncoder(model_path, max_length=512, trust_remote_code=True)
 
     results = {}
     for dataset_name in datasets:
@@ -89,7 +126,8 @@ def evaluate_mteb_reranking(model_path: str, datasets: list[str] = None):
         return {}
 
     tasks = mteb.get_tasks(tasks=datasets or BENCHMARK_DATASETS["mteb_reranking"])
-    model = CrossEncoder(model_path, max_length=512)
+    tokenizer = load_tokenizer(model_path)
+    model = CrossEncoder(model_path, max_length=512, tokenizer=tokenizer)
     evaluation = mteb.MTEB(tasks=tasks)
     results = evaluation.run(model, output_folder="results/mteb")
     return results
@@ -102,7 +140,10 @@ def main(
 ):
     print(f"Evaluating {model_path} on {benchmark}...")
 
-    ds_list = datasets.split(",") if datasets else None
+    if isinstance(datasets, tuple):
+        ds_list = list(datasets)
+    else:
+        ds_list = datasets.split(",") if datasets else None
 
     if benchmark == "beir":
         results = evaluate_beir(model_path, datasets=ds_list)
