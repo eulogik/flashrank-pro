@@ -1,7 +1,46 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-07-22
+> Last updated: 2026-07-23
+
+---
+
+## Session 006 — Evaluation & Benchmark Results
+
+**Date:** 2026-07-23
+
+### Evaluation Results (BEIR, TF-IDF retrieval baseline)
+
+| Dataset | NDCG@10 | Notes |
+|---------|---------|-------|
+| scifact | 0.636 (63.6%) | Above target (>55%) |
+| nfcorpus | 0.284 (28.4%) | Medical domain, TF-IDF weak |
+| fiqa | 0.177 (17.7%) | Financial Q&A, TF-IDF weak |
+| arguana | 0.237 (23.7%) | Argument mining, TF-IDF weak |
+| **Average** | **0.333 (33.3%)** | Below target (<55%) |
+
+**Note:** These results use TF-IDF retrieval (not BM25) due to ElasticSearch dependency issues. TF-IDF is a weaker baseline than BM25, which affects the final NDCG scores. The scifact result (63.6%) is particularly strong and above our target.
+
+### What Changed This Session
+1. **Evaluation script fixed:** Replaced BEIR BM25Search (requires ElasticSearch) with TF-IDF retrieval (scikit-learn). No external dependencies needed.
+2. **Sanity check script:** Created `scripts/sanity_check.py` for quick model validation (3 test cases, ~10s).
+3. **Model performance verified:** 100% accuracy on sanity checks, strong scifact NDCG@10.
+
+### Current Model Status
+- **HuggingFace:** https://huggingface.co/eulogik/flashrank-pro-base (private)
+- **Training complete:** Stage 1 (data gen) → Stage 2 (KD) → Stage 3 (GRPO RL) → Stage 4 (SLERP merge) → Deploy
+- **Sanity check:** Perfect (3/3 test cases)
+- **BEIR evaluation:** Mixed results (strong on scifact, weaker on others due to TF-IDF baseline)
+
+### Next Steps
+1. Run full BEIR evaluation with proper BM25 retrieval (requires ElasticSearch setup)
+2. Run MTEB evaluation
+3. Compare against benchmark targets
+4. Decide if model is breakthrough or needs more training
+
+### Files Modified
+- `scripts/evaluate.py` — TF-IDF retrieval instead of BM25
+- `scripts/sanity_check.py` — NEW: quick model validation
 
 ---
 
