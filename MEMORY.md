@@ -1,7 +1,48 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-07-23
+> Last updated: 2026-08-05
+
+---
+
+## Session 007 — BEIR diagnosis, jetsam killer, BEIR fine-tune running
+
+**Date:** 2026-08-05
+
+### Findings
+1. **Model underperforms BM25 on BEIR** (proper Okapi BM25, rank_bm25, k1=1.5, b=0.75):
+   scifact 0.5670 vs BM25-only 0.6367 (−0.070), nfcorpus 0.2922 vs 0.3014 (−0.009).
+   MTEB AskUbuntuDupQuestions MAP@1000 = 0.570 (isolated metric is fine).
+2. **Diagnosis:** scores well-spread but discrimination weak — relevant 0.684 vs non-relevant 0.631
+   (easy negatives 0.97 vs 0.005). Model trained only on easy/synthetic negatives → can't separate
+   BM25-selected candidates → relevant docs shuffle down. Eval loop verified 1.0 corr vs
+   sentence-transformers CrossEncoder — results are genuine.
+3. **JETSAM KILLS:** `python3` training processes were being SIGKILL'd at the first forward+backward,
+   invisible in unified log / crash reports. `launchctl print gui/$(id -u)/<job>` shows
+   `last exit reason = OS_REASON_JETSAM` (memory pressure; free% reads high AFTER the kill).
+   Fixes that worked: gradient checkpointing + batch 4 + threads 4, run via LaunchAgent
+   (`~/Library/LaunchAgents/com.flashrank.ft.plist`, KeepAlive, Nice -10, PYTHONFAULTHANDLER=1).
+   Normal shell `nohup & disown` does NOT protect against jetsam.
+4. **Launchd pitfall:** `/usr/bin/python3` is the same interpreter as shell `python3`; but a script
+   in /tmp breaks `os.path.dirname(__file__)`-relative imports. Use absolute path resolution.
+5. **BEIR train splits:** only scifact/fiqa/nfcorpus have train qrels; arguana/scidocs are zero-shot
+   (matches official BEIR). Data build costs 13 min/restart → cached to `models/.../train_examples.pkl`.
+
+### Current State
+- **Fine-tune RUNNING** via launchd: scifact+fiqa+nfcorpus train, BM25 hard negatives (5/q),
+  margin+BCE loss, grad checkpointing, batch 4, grad_accum 2, max_len 384, threads 4.
+  896 data steps, first scifact eval at step 200 (~4.5h), best-model saves at 400.
+- Hybrid BM25+model alpha sweep test died with hybrid_test.py (killed by me, superseded by fine-tune).
+
+### Next Steps
+1. Wait for step-200 scifact eval → compare vs 0.5670 and BM25-only 0.6367.
+2. If win: re-run full BEIR (6 datasets) + MTEB (askubuntu, SciDocsRR, StackOverflowDup).
+3. Commit fine-tune script + launchd plist + this log.
+
+### Files
+- `training/05_beir_finetune.py` — BEIR fine-tune (grad_accum, heartbeat, pickle cache, checkpointing)
+- `scripts/evaluate_beir_bm25.py`, `scripts/evaluate_mteb_rerank.py` — proper evals
+- `~/Library/LaunchAgents/com.flashrank.ft.plist` — jetsam-surviving launchd job
 
 ---
 
