@@ -276,8 +276,8 @@ def main():
                 for ps in pos_scores:
                     for ns in neg_scores:
                         margin_loss += torch.clamp(args.margin - (ps - ns), min=0.0)
-                        bce += -(torch.log(ps + 1e-7))
-                        n_pos += 1
+                    bce += -(torch.log(ps + 1e-7)) - torch.log(1 - torch.stack(neg_scores) + 1e-7).mean()
+                    n_pos += 1
             margin_loss = margin_loss / max(n_pos, 1)
             bce = bce / max(n_pos, 1)
             loss = margin_loss + args.bce_weight * bce
