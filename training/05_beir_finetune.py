@@ -33,7 +33,10 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts")),
+)
 from evaluate_beir_bm25 import build_or_load_index, retrieve
 
 
@@ -185,6 +188,7 @@ def main():
     ap.add_argument("--num_hard_negatives", type=int, default=5)
     ap.add_argument("--num_epochs", type=int, default=2)
     ap.add_argument("--batch_queries", type=int, default=8)
+    ap.add_argument("--grad_accum", type=int, default=1)
     ap.add_argument("--max_length", type=int, default=512)
     ap.add_argument("--lr", type=float, default=2e-5)
     ap.add_argument("--margin", type=float, default=0.15)
@@ -201,11 +205,25 @@ def main():
     print(f"Loading base model {args.model_path}...")
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForSequenceClassification.from_pretrained(args.model_path, trust_remote_code=True)
+    if hasattr(model, "gradient_checkpointing_enable"):
+        model.gradient_checkpointing_enable()
     model.train()
 
     print("Building training data (BM25 hard negatives)...")
     ds_list = args.datasets.split(",")
-    examples = build_training_data(ds_list, args.max_queries_per_dataset, args.num_hard_negatives, seed=0)
+    cache_path = os.path.join(args.output_dir, "train_examples.pkl")
+    import pickle
+
+    examples = None
+    if os.path.exists(cache_path):
+        with open(cache_path, "rb") as f:
+            examples = pickle.load(f)
+        print(f"  loaded {len(examples)} cached examples")
+    if examples is None:
+        examples = build_training_data(ds_list, args.max_queries_per_dataset, args.num_hard_negatives, seed=0)
+        os.makedirs(args.output_dir, exist_ok=True)
+        with open(cache_path, "wb") as f:
+            pickle.dump(examples, f)
     print(f"Total training examples: {len(examples)}")
     for e in examples[:2]:
         print(f"  sample: q={e['query'][:60]} pos={len(e['pos'])} negs={len(e['negs'])}")
@@ -217,7 +235,7 @@ def main():
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    total_steps = len(loader) * args.num_epochs
+    total_steps = len(loader) * args.num_epochs // args.grad_accum
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=total_steps)
 
     start_step = 0
@@ -238,6 +256,8 @@ def main():
     loss_ema = None
     for epoch in range(args.num_epochs):
         for batch in loader:
+            if step % 10 == 0:
+                print(f"  heartbeat step {step}", flush=True)
             input_ids, amask, labels, n_queries = batch
             logits = model(input_ids=input_ids, attention_mask=amask).logits.float().squeeze(-1)
             scores = torch.sigmoid(logits)
@@ -265,8 +285,9 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-            scheduler.step()
+            if step % args.grad_accum == 0:
+                optimizer.step()
+                scheduler.step()
             step += 1
 
             ema = loss_ema if loss_ema is not None else loss.item()
@@ -289,6 +310,12 @@ def main():
                     model.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
                     print(f"  >>> saved best to {args.output_dir}")
+                torch.save(
+                    {"model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                     "scheduler": scheduler.state_dict(), "step": step},
+                    os.path.join(args.output_dir, "checkpoint.pt"),
+                )
+                print(f"  >>> checkpoint saved at step {step}", flush=True)
 
         torch.save(
             {"model": model.state_dict(), "optimizer": optimizer.state_dict(),
