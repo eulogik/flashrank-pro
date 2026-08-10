@@ -1,7 +1,53 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-08-05
+> Last updated: 2026-08-06
+
+---
+
+## Session 008 — Colab fine-tune completes; regression; loss bug found; next: ckpt/model + v2
+
+**Date:** 2026-08-06
+
+### Full BEIR results — Colab final model (2-epoch, margin+BCE-pos-only bug) — `eulogik/flashrank-pro-beir`
+
+| Dataset | Final model | Base model | Δ vs base | Official BM25+CE |
+|---|---|---|---|---|
+| nfcorpus | 0.2343 | 0.292 | −0.058 | 0.350 |
+| scifact | 0.6112 | 0.567 | +0.044 | 0.688 |
+| fiqa | 0.2833 | 0.221 | +0.062 | 0.347 |
+| webis-touche2020 | 0.2461 | 0.161 | +0.085 | 0.271 |
+| arguana | 0.2473 | (untested) | — | 0.449 |
+| scidocs | 0.1197 | (untested) | — | 0.158 |
+| **AVERAGE** | **0.2903** | ~0.310 (4 matched) | — | — |
+
+**Key comparisons:** step-400 local checkpoint scifact = **0.6467** (BEST scifact, above BM25-only 0.6367, below official 0.688). Full fine-tune scored 0.6112 — **regressed** vs step-400. nfcorpus regressed below base.
+
+### Findings
+1. **Loss bug (root cause of regression):** BCE penalized positive docs only (`bce += -log(ps)`, no `-log(1-ns)` term). Everything saturated toward score 1 → ranking collapsed. FIXED in `training/05_beir_finetune.py` + notebook (now `-torch.log(1 - neg_s + 1e-7).mean()`). Commits `8996854`, `4ecda13`.
+2. **Colab reliability:** sessions died 3x mid-eval. Resumable eval built (skips done datasets via `Drive/eval/*.json`, fp16 `model.half()` → ~2x faster, ~15 min/dataset on T4).
+3. **40q in-training eval (notebook) tracks poorly** — 0.5471→0.5544 while full-set went 0.567→0.6467. Full-set is the metric of record.
+4. **Jetsam on Mac** suppressed via LaunchAgent + gradient checkpointing + batch 4 (Session 007) — local run killed per user request at step 200/1791 (second run, warm start; loss showed saturation drift: bce 0.0005→0.1580).
+
+### Current State
+- `eulogik/flashrank-pro-beir` (final, regressed) pushed to HF ✓ — user did this from Colab
+- `eulogik/flashrank-pro-beir-step400` on HF (scifact 0.6467) — best verified model
+- **PENDING: `ckpt/model` (Colab best-by-40q checkpoint) NOT yet pushed/evaluated** — the key remaining measurement
+- Local machine free (no training/eval running). `models/flashrank-pro-beir` = step-400 local copy
+- `results/beir/colab_final_model_results.json` — Colab numbers preserved
+- Full-eval cell (resumable, fp16) shared with user; ALSO at `scripts/colab_full_eval.py` (repo copy — note: repo is private, raw fetch 404)
+
+### Next Steps
+1. **Push ckpt/model to HF** from Colab (`upload_folder(DRIVE/ckpt/model → eulogik/flashrank-pro-beir-best)`) → evaluate locally overnight (machine free): full 6-dataset BEIR table for the best checkpoint.
+2. **V2 training with fixed loss** (negative BCE) — on Colab (fast) or local — expected to fix saturation regression; evaluate same 6 datasets.
+3. If ckpt/model > final on scifact+nfcorpus → the story is "early-stop sweet spot"; publish best model + full comparison table vs mxbai-rerank-v2 (57.49 official protocol — flag protocol mismatch: ours = text-only BM25 top-100, official = Lucene title+text).
+4. Update README/model card with honest numbers; keep eulogik/flashrank-pro-beir-step400 as the HF headline model.
+
+### Files
+- `scripts/colab_full_eval.py` — resumable full BEIR eval (fp16, skip-done)
+- `scripts/diagnostics/diagnose.py`, `scripts/smoke_colab.py` — moved from /tmp (Session 007)
+- `results/beir/colab_final_model_results.json`
+- notebook `notebooks/flashrank_beir_finetune_colab.ipynb` — loss fixed + ckpt push hint
 
 ---
 
