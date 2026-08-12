@@ -183,6 +183,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model_path", default="eulogik/flashrank-pro-base")
     ap.add_argument("--datasets", default="scifact,fiqa,arguana,scidocs,nfcorpus")
+    ap.add_argument("--data_jsonl", default=None, help="JSONL of {query,pos,negs} — skips BEIR build")
     ap.add_argument("--output_dir", default="models/flashrank-pro-beir")
     ap.add_argument("--max_queries_per_dataset", type=int, default=4000)
     ap.add_argument("--num_hard_negatives", type=int, default=5)
@@ -215,7 +216,13 @@ def main():
     import pickle
 
     examples = None
-    if os.path.exists(cache_path):
+    if args.data_jsonl:
+        import json as _json
+
+        with open(args.data_jsonl) as f:
+            examples = [_json.loads(line) for line in f]
+        print(f"  loaded {len(examples)} examples from {args.data_jsonl}")
+    elif os.path.exists(cache_path):
         with open(cache_path, "rb") as f:
             examples = pickle.load(f)
         print(f"  loaded {len(examples)} cached examples")
