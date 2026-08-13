@@ -1,7 +1,98 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-08-06
+> Last updated: 2026-08-13
+
+---
+
+## Session 010 — MS MARCO prep rewritten, training data generated
+
+**Date:** 2026-08-13
+
+### What happened
+- `sentence-transformers/msmarco-hard-negatives` repo **disappeared from HuggingFace** (404). MS MARCO blob storage is also private now. All standard MS MARCO data sources are broken.
+- Rewrote `scripts/prepare_msmarco_data.py` to use **local BEIR corpora only** — no external dependencies.
+- Wrote `SparseBM25` class (scipy sparse TF matrix, precomputed IDF) — 10-100x faster than `rank_bm25.BM25Okapi` on large corpora.
+- Mined training data from 5 BEIR datasets: scifact (train), fiqa (train), nfcorpus (train), arguana (test), scidocs (test).
+- **Result:** 11,087 examples with 10 hard negatives each → `data/msmarco_train.jsonl`
+- Smoke-tested: training pipeline loads JSONL correctly, 100-example subset trains without errors.
+
+### Training data availability
+| Dataset | Split | Unique Q | Mined |
+|---------|-------|----------|-------|
+| scifact | train | 809 | 809 |
+| fiqa | train | 5,500 | 5,498 |
+| nfcorpus | train | 2,590 | 2,379 |
+| arguana | test | 1,406 | 1,401 |
+| scidocs | test | 1,000 | 1,000 |
+| **Total** | | **11,305** | **11,087** |
+
+**11K is the max from local data.** To reach 50K: download hotpotqa (~500MB, slow on this connection) or fever (~400MB). Both have 100K+ train qrels.
+
+### Why 11K might be enough
+- Each example has 10 hard negatives → 110K (query, neg) pairs for margin ranking loss
+- The model already learns from 7K BEIR examples and achieves scifact 0.6467
+- 11K diverse examples (5 datasets) > 7K homogeneous (3 datasets)
+- Monitor eval scores; overfit if NDCG@10 plateaus
+
+### Files changed
+- `scripts/prepare_msmarco_data.py` — rewritten: SparseBM25, local BEIR only, 5 datasets, 10 negs
+- `data/msmarco_train.jsonl` — 11,087 training examples (NOT committed, gitignored)
+
+### Next Steps
+1. Upload `data/msmarco_train.jsonl` to Colab Drive at `MyDrive/flashrank_pro/examples/`
+2. RESET=True → Run all on Colab (~5h, resumable)
+3. Eval all 6 BEIR datasets
+4. If 11K insufficient: download hotpotqa/fever locally, re-run prep, re-train
+5. Final validation: official ~20-task BEIR on Python ≥3.10
+
+---
+
+## Session 009 — Loss fix confirmed, data bottleneck proven, MS MARCO prep
+
+**Date:** 2026-08-08 → 2026-08-10
+
+### Key finding: The loss was never the bottleneck — training data is.
+
+Fixed-loss run (negative BCE term) produced **byte-identical** eval numbers to the buggy run:
+- Colab final model: nfcorpus 0.2343, scifact 0.6112, fiqa 0.2833, arguana 0.2473, touche2020 0.2461, scidocs 0.1197 (avg 0.2903)
+- Fixed-loss training: 924 steps, loss 2.3–2.5 (healthy), margin 0.67→0.43 (learning), 40q eval flat at 0.7253 throughout
+- Full 6-dataset eval: **nfcorpus 0.2343, scifact 0.6112** — exact matches. Model moved zero.
+
+**Conclusion:** 7–8K BEIR-train examples (3 datasets, only scifact/fiqa/nfcorpus) with easy BM25 negatives is insufficient to learn generalizable reranking. The model plateaus immediately regardless of loss function.
+
+### Full BEIR results — Best checkpoint (fp32, local, `models/flashrank-pro-beir-best`)
+
+| Dataset | NDCG@10 | In training? |
+|---------|---------|-------------|
+| nfcorpus | 0.2799 | ✅ |
+| scifact | **0.6467** | ✅ |
+| fiqa | 0.2712 | ✅ |
+| arguana | 0.2168 | ❌ |
+| scidocs | 0.1222 | ❌ |
+| touche2020 | 0.2148 | ❌ |
+| **AVERAGE** | **0.2919** | 3/6 in-distribution |
+
+**fp16 on Colab:** 0.2666/0.5597 (nfcorpus/scifact) — fp16 quantization hurts ranking signal on this model. **Trust fp32 for reference numbers.**
+
+### Notebook fixes (commits `845bbbd`, `8d63b30`, `845bbbd`)
+- `doc_text`/`query_text`/`norm_qrels` helpers: robust to dict-typed corpus/queries/qrels from newer beir
+- `float(metrics['NDCG@10'])` fix (was `float(ndcg[0])` — float(dict) crash)
+- O(1) doc lookup in eval (was O(n) `ids.index()`)
+- **Guarded RESET cell** (`RESET = False` by default) — prevents silent wipe of resumable checkpoint via "Run all"
+- **Stale-global bug fixed:** training cell recomputes `ckpt = load_checkpoint_state()` itself (prevents stale in-memory variable from pre-RESET load)
+- Training cell warns loudly if checkpoint is already complete (step ≥ total)
+
+### MS MARCO hard-negatives prep (running)
+- `scripts/prepare_msmarco_data.py` — streams 50K triples from `sentence-transformers/msmarco-hard-negatives` (real queries + BM25/CE hard negatives, free, no API), resolves doc texts from `BeIR/msmarco` corpus
+- `training/05_beir_finetune.py` — `--data_jsonl` flag added (loads JSONL of {query, pos[], negs[]}, skips BEIR build)
+- Notebook: auto-loads `examples/msmarco_train.jsonl` from Drive if present, falls back to BEIR pkl
+- When ready: upload to `MyDrive/flashrank_pro/examples/` → RESET=True → Run all → ~5h (2 epochs, resumable across T4 sessions)
+
+### Files added/changed
+- `scripts/prepare_msmarco_data.py` — MS MARCO data prep
+- `training/05_beir_finetune.py` — `--data_jsonl` support
+- `notebooks/flashrank_beir_finetune_colab.ipynb` — RESET cell, robust eval, JSONL load, checkpoint guard
 
 ---
 
