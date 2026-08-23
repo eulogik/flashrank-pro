@@ -1,7 +1,41 @@
 # FlashRank-Pro — Memory & Handoff Log
 
 > **Living document.** Append new sessions at the top. Never delete history.
-> Last updated: 2026-08-13
+> Last updated: 2026-08-23
+
+---
+
+## Session 011 — MS MARCO data UNBLOCKED (Session 010 conclusion was wrong), 100K examples generated
+
+**Date:** 2026-08-13
+
+### Critical correction
+Session 010's "all MS MARCO sources are gone" was **wrong**. Two verification bugs:
+1. `HfApi().repo_info()` / `hf_hub_download()` default to `repo_type="model"` → false 404s for dataset repos. Must pass `repo_type="dataset"` or use `api.dataset_info()`.
+2. `next(iter(load_dataset(...)))` on an `IterableDatasetDict` returns the split name (`"train"`), not a row. Must use `ds["train"]` or `split="train"`.
+
+Both datasets work fine:
+- `sentence-transformers/msmarco-hard-negatives` — 500K+ queries, pre-mined hard negatives (bm25/ce sources)
+- `sentence-transformers/msmarco` "queries" config — qid→query text (fields: `query_id`, `query`)
+
+### What was built
+Rewrote `scripts/prepare_msmarco_data.py`: 4 checkpointed phases (sample → queries → corpus docs → write). Cache in `data/.msmarco_prep/*.pkl`.
+
+**Generated `data/msmarco_train.jsonl`: 100,000 examples, 247 MB, 0 dropped** (~14 min total):
+- Real MS MARCO web queries; 1 positive + 6 hard negatives each (CE-priority sourcing)
+- 647K unique passages resolved from BeIR/msmarco corpus at ~12.5K docs/s
+
+### T4 OOM fixes (earlier same session)
+Notebook: gradient checkpointing enabled (`use_reentrant=False`), batch_size 8→2, max_length 384→256, grad_accum 2→8 (effective batch 16 unchanged), `torch.cuda.amp`→`torch.amp`, save_ckpt recreates dir after RESET, corrupt-JSONL fallback to BEIR rebuild.
+
+### Training math (T4, measured 3.2s/opt-step = 16 queries)
+100K × 1 epoch ≈ 5.5–6h; × 2 epochs ≈ 11h (resumable via Drive checkpoints every 100 steps).
+
+### Next steps
+1. Upload `data/msmarco_train.jsonl` (247MB) → `MyDrive/flashrank_pro/examples/`
+2. RESET=True once → Run all; recommend `epochs: 2` if sessions allow, else 1 epoch on full 100K > 2 epochs on a subset
+3. Eval all 6 BEIR datasets fp32 locally afterward
+4. Later: eval protocol honesty (title+text BM25), consistent train/eval max_length, margin tuning
 
 ---
 
