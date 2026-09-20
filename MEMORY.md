@@ -451,7 +451,29 @@ Initial project creation. Deep research on reranker landscape → strategy defin
 - **Teacher:** `mixedbread-ai/mxbai-rerank-large-v2` (1.5B) for soft labels
 - **Alternative teacher:** `Qwen/Qwen3-Reranker-8B` — larger but free and Apache 2.0
 
-### Open Questions / Future Work
+#
+## Session 012 — 2026-09-20 (full training run COMPLETE)
+
+**Result: TRAINING WORKED.** 12,500 steps, 0 skipped updates, +22.6% average NDCG@10.
+
+| Dataset | Before (step400 init) | After (12500 steps) | Delta |
+|---------|----------------------|---------------------|-------|
+| nfcorpus | 0.2799 | 0.3260 | +16.5% |
+| scifact | 0.6467 | 0.6894 | +6.6% |
+| fiqa | 0.2753 | 0.3370 | +22.4% |
+| arguana | 0.0726 | 0.1446 | +99.2% |
+| scidocs | 0.0772 | 0.1600 | +107.3% |
+| webis-touche2020 | 0.0020 | SKIPPED | OOM on 382K docs, 49 queries, zero-signal |
+| **5-set average** | **0.2703** | **0.3314** | **+22.6%** |
+
+- Training: batch 4×4 (eff 16), pure fp32, lr 2e-5, 2 epochs MS MARCO 100K (1 pos + 6 CE hard negs).
+- Final loss ~0.51, margin frequently 0.0 (pos > neg by full margin on many batches).
+- Best in-training probe: scifact(40q) 0.8404 vs 0.7253 baseline (+15.9%).
+- Final model at `DRIVE:/flashrank_pro/final/model` + `beir_results.json`.
+- Eval lesson: query-batch (100) the eval, free docs_text before scoring, max_length 256 — full 6-set eval ~20s on T4.
+- Pitfall: touche2020 (382K docs) OOMs Colab RAM in eval; skip it (SKIP set in eval cell).
+
+## Open Questions / Future Work
 - [ ] Should we use a multilingual corpus for Stage 1 or just English?
 - [ ] Should we add pairwise ranking loss (PRD) as an additional loss term?
 - [ ] Need to test actual T4 memory usage for ModernBERT-base FT (batch 8)
