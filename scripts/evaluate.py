@@ -130,7 +130,8 @@ def evaluate_beir(
                 sorted_idx = np.argsort(-scores)
                 reranked[qid] = {doc_ids[i]: float(scores[i]) for i in sorted_idx}
 
-            ndcg = EvaluateRetrieval.evaluate(qrels, reranked, [10])
+            eval_out = EvaluateRetrieval.evaluate(qrels, reranked, [10])
+            ndcg = eval_out[0] if isinstance(eval_out, tuple) else eval_out
             results[dataset_name] = ndcg
             print(f"  NDCG@10: {ndcg.get('NDCG@10', 'N/A'):.4f}")
         except Exception as e:
