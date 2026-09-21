@@ -63,29 +63,32 @@ BENCHMARK_DATASETS = {
 }
 
 
-def tfidf_retrieve(corpus: dict, queries: dict, top_k: int = 100):
-    """Simple TF-IDF retrieval as BM25 substitute."""
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
+def bm25_retrieve(corpus: dict, queries: dict, top_k: int = 100):
+    """BM25 first-stage retrieval (same protocol as published BEIR rerank numbers)."""
+    from rank_bm25 import BM25Okapi
 
     doc_ids = list(corpus.keys())
-    doc_texts = [corpus[did]["text"] for did in doc_ids]
-
-    vectorizer = TfidfVectorizer(stop_words="english", max_features=10000)
-    doc_vectors = vectorizer.fit_transform(doc_texts)
+    tokenized_corpus = [corpus[did].get("title", "") + " " + corpus[did]["text"] for did in doc_ids]
+    tokenized_corpus = [t.lower().split() for t in tokenized_corpus]
+    bm25 = BM25Okapi(tokenized_corpus)
 
     results = {}
     for qid, query in queries.items():
-        q_vec = vectorizer.transform([query])
-        sims = cosine_similarity(q_vec, doc_vectors).flatten()
-        top_idx = np.argsort(-sims)[:top_k]
-        results[qid] = {doc_ids[i]: float(sims[i]) for i in top_idx}
+        scores = bm25.get_scores(query.lower().split())
+        top_idx = np.argsort(-scores)[:top_k]
+        results[qid] = {doc_ids[i]: float(scores[i]) for i in top_idx}
 
     return results
 
 
-def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100):
-    """Evaluate on BEIR benchmark datasets using TF-IDF + reranker."""
+def evaluate_beir(
+    model_path: str,
+    datasets: list[str] = None,
+    top_k: int = 100,
+    batch_size: int = 64,
+    max_length: int = 256,
+):
+    """Evaluate on BEIR datasets using BM25 top-k + cross-encoder rerank."""
     try:
         from beir import util
         from beir.datasets.data_loader import GenericDataLoader
@@ -97,38 +100,42 @@ def evaluate_beir(model_path: str, datasets: list[str] = None, top_k: int = 100)
     if datasets is None:
         datasets = BENCHMARK_DATASETS["beir"]
 
-    reranker = CrossEncoder(model_path, max_length=512, trust_remote_code=True)
+    reranker = CrossEncoder(model_path, max_length=max_length, trust_remote_code=True)
 
     results = {}
     for dataset_name in datasets:
         print(f"\nEvaluating {dataset_name}...")
-        url = f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset_name}.zip"
-        data_path = os.path.join("data/beir", dataset_name)
         try:
-            corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split="test")
-        except Exception:
-            print(f"Downloading {dataset_name}...")
-            util.download_and_unzip(url, "data/beir")
-            corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split="test")
+            url = f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset_name}.zip"
+            data_path = os.path.join("data/beir", dataset_name)
+            try:
+                corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split="test")
+            except Exception:
+                print(f"Downloading {dataset_name}...")
+                util.download_and_unzip(url, "data/beir")
+                corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split="test")
 
-        tfidf_results = tfidf_retrieve(corpus, queries, top_k=top_k)
+            bm25_results = bm25_retrieve(corpus, queries, top_k=top_k)
 
-        reranked = {}
-        for qid in tqdm(queries, desc=f"Reranking {dataset_name}"):
-            query = queries[qid]
-            doc_ids = list(tfidf_results[qid].keys())[:top_k]
-            docs = [corpus[doc_id]["text"] for doc_id in doc_ids]
-            if not docs:
-                reranked[qid] = {}
-                continue
-            pairs = [[query, doc] for doc in docs]
-            scores = reranker.predict(pairs)
-            sorted_idx = np.argsort(-scores)
-            reranked[qid] = {doc_ids[i]: float(scores[i]) for i in sorted_idx}
+            reranked = {}
+            for qid in tqdm(queries, desc=f"Reranking {dataset_name}"):
+                query = queries[qid]
+                doc_ids = list(bm25_results[qid].keys())[:top_k]
+                docs = [corpus[doc_id].get("title", "") + " " + corpus[doc_id]["text"] for doc_id in doc_ids]
+                if not docs:
+                    reranked[qid] = {}
+                    continue
+                pairs = [[query, doc] for doc in docs]
+                scores = reranker.predict(pairs, batch_size=batch_size, show_progress_bar=False)
+                sorted_idx = np.argsort(-scores)
+                reranked[qid] = {doc_ids[i]: float(scores[i]) for i in sorted_idx}
 
-        ndcg = EvaluateRetrieval.evaluate(qrels, reranked, [10])
-        results[dataset_name] = ndcg
-        print(f"  NDCG@10: {ndcg.get('NDCG@10', 'N/A'):.4f}")
+            ndcg = EvaluateRetrieval.evaluate(qrels, reranked, [10])
+            results[dataset_name] = ndcg
+            print(f"  NDCG@10: {ndcg.get('NDCG@10', 'N/A'):.4f}")
+        except Exception as e:
+            print(f"  Skipped {dataset_name}: {e}")
+            continue
 
     return results
 
@@ -152,6 +159,10 @@ def main(
     model_path: str = "models/flashrank-pro-merged",
     benchmark: str = "beir",
     datasets: Optional[str] = None,
+    top_k: int = 100,
+    batch_size: int = 64,
+    max_length: int = 256,
+    output_path: str = "results/eval_beir.json",
 ):
     print(f"Evaluating {model_path} on {benchmark}...")
 
@@ -161,15 +172,17 @@ def main(
         ds_list = datasets.split(",") if datasets else None
 
     if benchmark == "beir":
-        results = evaluate_beir(model_path, datasets=ds_list)
+        results = evaluate_beir(
+            model_path, datasets=ds_list, top_k=top_k,
+            batch_size=batch_size, max_length=max_length,
+        )
     elif benchmark == "mteb":
         results = evaluate_mteb_reranking(model_path, datasets=ds_list)
     else:
         print(f"Unknown benchmark: {benchmark}")
         return
 
-    os.makedirs("results", exist_ok=True)
-    output_path = f"results/eval_{benchmark}.json"
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nResults saved to {output_path}")

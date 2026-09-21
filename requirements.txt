@@ -18,6 +18,8 @@ tiktoken>=0.5.0
 
 # Evaluation
 numpy
+rank-bm25>=0.2.2
+scikit-learn>=1.3.0
 
 # Optional
 wandb>=0.15.0  # for experiment tracking
