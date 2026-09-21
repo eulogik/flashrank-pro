@@ -16,6 +16,8 @@
   </p>
 </p>
 
+![FlashRank-Pro Base: 149M-parameter ModernBERT reranker, BEIR-style 5-set average NDCG@10 0.3314](model_cards/flashrank-pro-base/assets/hero.png)
+
 ---
 
 ## Why FlashRank-Pro?
@@ -78,6 +80,8 @@ FlashRank-Pro Base measured **0.3314 five-set NDCG@10** under text-only BM25 top
 | arguana | 0.0726 | 0.1446 | +99.2% |
 | scidocs | 0.0772 | 0.1600 | +107.3% |
 | **Five-set average** | **0.2703** | **0.3314** | **+22.6%** |
+
+![Measured BEIR-style NDCG@10: final model versus run-init checkpoint](model_cards/flashrank-pro-base/assets/benchmarks.png)
 
 Model card: `model_cards/flashrank-pro-base/README.md`. Hugging Face: `eulogik/flashrank-pro-base`.
 

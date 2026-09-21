@@ -93,15 +93,13 @@ model-index:
 
 # FlashRank-Pro Base
 
-<p align="center">
-  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
-  <img src="https://img.shields.io/badge/Architecture-ModernBERT--base-7c3aed" alt="ModernBERT base">
-  <img src="https://img.shields.io/badge/Parameters-149M-22c55e" alt="149M parameters">
-  <img src="https://img.shields.io/badge/BEIR--style%205--set%20avg-NDCG%4010%200.3314-0ea5e9" alt="BEIR-style 5-set average NDCG at 10: 0.3314">
-  <img src="https://img.shields.io/badge/Same--run%20change-%2B22.6%25-16a34a" alt="Same-run change: plus 22.6 percent">
-  <img src="https://img.shields.io/badge/Training-100K%20MS%20MARCO-orange" alt="Training: 100K MS MARCO">
-  <img src="https://img.shields.io/badge/Framework-Transformers-ff9d00" alt="Framework: Transformers">
-</p>
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+![ModernBERT base](https://img.shields.io/badge/Architecture-ModernBERT--base-7c3aed)
+![149M parameters](https://img.shields.io/badge/Parameters-149M-22c55e)
+![BEIR-style 5-set average NDCG at 10: 0.3314](https://img.shields.io/badge/BEIR--style%205--set%20avg-NDCG%4010%200.3314-0ea5e9)
+![Same-run change: plus 22.6 percent](https://img.shields.io/badge/Same--run%20change-%2B22.6%25-16a34a)
+![Training: 100K MS MARCO](https://img.shields.io/badge/Training-100K%20MS%20MARCO-orange)
+![Framework: Transformers](https://img.shields.io/badge/Framework-Transformers-ff9d00)
 
 ![FlashRank-Pro Base overview](assets/hero.png)
 
