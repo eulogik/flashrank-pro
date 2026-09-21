@@ -64,6 +64,23 @@ results = reranker.rerank(
 | `flashrank-pro-base` | **149M** | >55 | **~50ms** | 8K | ✅ <50ms |
 | `flashrank-pro-large` | **395M** | >60 | **~120ms** | 32K | ✅ <100ms |
 
+Latency and target BEIR values above are design goals, not measured guarantees.
+
+### Measured result
+
+FlashRank-Pro Base measured **0.3314 five-set NDCG@10** under text-only BM25 top-100 reranking (`max_length=256`), versus **0.2703** for the run initialization checkpoint (**+22.6%**). `webis-touche2020` was omitted because its 382K-document corpus exceeded Colab RAM. These are not official BEIR leaderboard scores.
+
+| Dataset | Run init | Final | Gain |
+|---|---:|---:|---:|
+| nfcorpus | 0.2799 | 0.3260 | +16.5% |
+| scifact | 0.6467 | 0.6894 | +6.6% |
+| fiqa | 0.2753 | 0.3370 | +22.4% |
+| arguana | 0.0726 | 0.1446 | +99.2% |
+| scidocs | 0.0772 | 0.1600 | +107.3% |
+| **Five-set average** | **0.2703** | **0.3314** | **+22.6%** |
+
+Model card: `model_cards/flashrank-pro-base/README.md`. Hugging Face: `eulogik/flashrank-pro-base`.
+
 ### Reference Comparison
 
 | Model | Params | BEIR NDCG@10 | Latency | Architecture |

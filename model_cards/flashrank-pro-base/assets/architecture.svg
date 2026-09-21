@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="620" viewBox="0 0 1600 620">
+  <defs>
+    <linearGradient id="node" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="620" fill="#0b1220"/>
+  <text x="80" y="80" font-family="Inter, Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="#ffffff">How FlashRank-Pro Base scores</text>
+  <text x="80" y="122" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" fill="#94a3b8">One forward pass per query-document pair. Higher means more relevant.</text>
+  <rect x="60" y="220" width="180" height="140" rx="18" fill="url(#node)"/>
+  <rect x="270" y="220" width="180" height="140" rx="18" fill="url(#node)"/>
+  <rect x="480" y="220" width="260" height="140" rx="18" fill="url(#node)"/>
+  <rect x="770" y="220" width="180" height="140" rx="18" fill="url(#node)"/>
+  <rect x="980" y="220" width="280" height="140" rx="18" fill="#7c3aed"/>
+  <rect x="1290" y="220" width="250" height="140" rx="18" fill="#22d3ee"/>
+  <text x="150" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0b1220">Query</text>
+  <text x="360" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0b1220">Document</text>
+  <text x="610" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0b1220">Pair text</text>
+  <text x="860" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0b1220">Tokenizer</text>
+  <text x="1120" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#ffffff">ModernBERT</text>
+  <text x="1415" y="272" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#06121f">Score</text>
+  <text x="150" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#334155">user question</text>
+  <text x="360" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="20" fill="#334155">candidate doc</text>
+  <text x="610" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="20" fill="#334155">query + sep + doc</text>
+  <text x="860" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#334155">eval length 256</text>
+  <text x="1120" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#ffffff">149M bidirectional</text>
+  <text x="1415" y="308" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#06121f">[CLS] linear sigmoid</text>
+  <line x1="240" y1="290" x2="268" y2="290" stroke="#7c3aed" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="450" y1="290" x2="478" y2="290" stroke="#7c3aed" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="740" y1="290" x2="768" y2="290" stroke="#7c3aed" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="950" y1="290" x2="978" y2="290" stroke="#7c3aed" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="1260" y1="290" x2="1288" y2="290" stroke="#7c3aed" stroke-width="5" marker-end="url(#arrow)"/>
+  <text x="80" y="450" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#cbd5e1">Joint query-document attention lets the model compare the exact candidate against the exact question.</text>
+  <text x="80" y="488" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#94a3b8">Use it after BM25 or dense retrieval: retrieve 50-200 candidates, rerank the top 5-20.</text>
+  <text x="80" y="560" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">Cross-encoder cost grows with candidate count, so reranking is a precision layer, not a full-corpus retriever.</text>
+</svg>

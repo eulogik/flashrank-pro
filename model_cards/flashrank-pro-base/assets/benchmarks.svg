@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="940" viewBox="0 0 1600 940">
+  <defs>
+    <linearGradient id="final" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="940" fill="#f8fafc"/>
+  <text x="80" y="82" font-family="Inter, Arial, Helvetica, sans-serif" font-size="48" font-weight="800" fill="#0f172a">Measured BEIR-style NDCG@10</text>
+  <text x="80" y="124" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" fill="#475569">Final model against the run initialization checkpoint · text-only BM25 top-100 · max_length 256</text>
+  <rect x="1180" y="48" width="340" height="84" rx="16" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="1210" y="72" width="34" height="20" fill="#64748b"/>
+  <text x="1254" y="89" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#0f172a">Run init</text>
+  <rect x="1210" y="102" width="34" height="20" fill="url(#final)"/>
+  <text x="1254" y="119" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#0f172a">Final model</text>
+  <line x1="120" y1="750" x2="1540" y2="750" stroke="#0f172a" stroke-width="2"/>
+  <line x1="120" y1="150" x2="1540" y2="150" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="120" y1="300" x2="1540" y2="300" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="120" y1="450" x2="1540" y2="450" stroke="#e2e8f0" stroke-width="1"/>
+  <line x1="120" y1="600" x2="1540" y2="600" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="88" y="156" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">0.80</text>
+  <text x="88" y="306" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">0.60</text>
+  <text x="88" y="456" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">0.40</text>
+  <text x="88" y="606" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">0.20</text>
+  <text x="88" y="754" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">0.00</text>
+  <line x1="120" y1="547.3" x2="1540" y2="547.3" stroke="#64748b" stroke-width="2" stroke-dasharray="10 8"/>
+  <line x1="120" y1="501.5" x2="1540" y2="501.5" stroke="#7c3aed" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="1524" y="534" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">init avg 0.2703</text>
+  <text x="1524" y="488" text-anchor="end" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#7c3aed">final avg 0.3314</text>
+  <rect x="152" y="540.1" width="100" height="209.9" fill="#64748b"/>
+  <rect x="272" y="505.5" width="100" height="244.5" fill="url(#final)"/>
+  <rect x="436" y="265" width="100" height="485" fill="#64748b"/>
+  <rect x="556" y="233" width="100" height="517" fill="url(#final)"/>
+  <rect x="720" y="543.5" width="100" height="206.5" fill="#64748b"/>
+  <rect x="840" y="497.3" width="100" height="252.7" fill="url(#final)"/>
+  <rect x="1004" y="695.6" width="100" height="54.4" fill="#64748b"/>
+  <rect x="1124" y="641.6" width="100" height="108.4" fill="url(#final)"/>
+  <rect x="1288" y="692.1" width="100" height="57.9" fill="#64748b"/>
+  <rect x="1408" y="630" width="100" height="120" fill="url(#final)"/>
+  <text x="202" y="524" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.2799</text>
+  <text x="322" y="489" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.3260</text>
+  <text x="486" y="249" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.6467</text>
+  <text x="606" y="217" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.6894</text>
+  <text x="770" y="527" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.2753</text>
+  <text x="890" y="481" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.3370</text>
+  <text x="1054" y="680" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.0726</text>
+  <text x="1174" y="626" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.1446</text>
+  <text x="1338" y="676" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.0772</text>
+  <text x="1458" y="614" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#0f172a">0.1600</text>
+  <text x="262" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">nfcorpus</text>
+  <text x="546" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">scifact</text>
+  <text x="830" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">fiqa</text>
+  <text x="1114" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">arguana</text>
+  <text x="1398" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">scidocs</text>
+  <text x="262" y="824" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#15803d">+16.5%</text>
+  <text x="546" y="824" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#15803d">+6.6%</text>
+  <text x="830" y="824" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#15803d">+22.4%</text>
+  <text x="1114" y="824" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#15803d">+99.2%</text>
+  <text x="1398" y="824" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#15803d">+107.3%</text>
+  <text x="80" y="882" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#475569">Five-set average: 0.2703 to 0.3314, +22.6%. webis-touche2020 was omitted because its 382K-document corpus exceeded Colab RAM.</text>
+  <text x="80" y="912" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">Not an official BEIR leaderboard run. Same-run comparison only; retrieval and tokenization settings can change absolute scores.</text>
+</svg>

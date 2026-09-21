@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560">
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0ea5e9"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="560" fill="#0b1220"/>
+  <text x="80" y="76" font-family="Inter, Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#ffffff">Training recipe behind the final weights</text>
+  <text x="80" y="116" font-family="Inter, Arial, Helvetica, sans-serif" font-size="25" fill="#94a3b8">MS MARCO hard negatives, stable fp32 optimization, and resumable Colab training.</text>
+  <rect x="60" y="160" width="340" height="230" rx="20" fill="#111c33" stroke="#334155"/>
+  <rect x="426" y="160" width="340" height="230" rx="20" fill="#111c33" stroke="#334155"/>
+  <rect x="792" y="160" width="380" height="230" rx="20" fill="#111c33" stroke="#334155"/>
+  <rect x="1198" y="160" width="340" height="230" rx="20" fill="#111c33" stroke="#334155"/>
+  <text x="230" y="216" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#ffffff">100K examples</text>
+  <text x="596" y="216" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#ffffff">1 + 6 pairs</text>
+  <text x="982" y="216" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#ffffff">12,500 steps</text>
+  <text x="1368" y="216" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#ffffff">BM25 top-100</text>
+  <text x="230" y="256" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Real MS MARCO queries</text>
+  <text x="230" y="290" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">247 MB training file</text>
+  <text x="230" y="324" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">0 dropped examples</text>
+  <text x="596" y="256" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">One positive passage</text>
+  <text x="596" y="290" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Six CE-priority negatives</text>
+  <text x="596" y="324" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Margin + BCE objective</text>
+  <text x="982" y="256" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">2 epochs, batch 4 x 4</text>
+  <text x="982" y="290" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Pure fp32, lr 2e-5</text>
+  <text x="982" y="324" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">0 skipped optimizer steps</text>
+  <text x="1368" y="256" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">NDCG@10 evaluation</text>
+  <text x="1368" y="290" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Five reported datasets</text>
+  <text x="1368" y="324" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" fill="#cbd5e1">Checkpoints every 100</text>
+  <line x1="400" y1="275" x2="424" y2="275" stroke="#0ea5e9" stroke-width="5" marker-end="url(#arrow2)"/>
+  <line x1="766" y1="275" x2="790" y2="275" stroke="#0ea5e9" stroke-width="5" marker-end="url(#arrow2)"/>
+  <line x1="1172" y1="275" x2="1196" y2="275" stroke="#0ea5e9" stroke-width="5" marker-end="url(#arrow2)"/>
+  <text x="80" y="470" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#cbd5e1">Final loss settled near 0.51 while the margin term repeatedly reached 0.0 on training batches.</text>
+  <text x="80" y="510" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">Checkpoints make long Colab training resumable; this run resumed cleanly through session restarts.</text>
+</svg>

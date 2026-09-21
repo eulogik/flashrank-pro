@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="0.55" stop-color="#171233"/>
+      <stop offset="1" stop-color="#08222b"/>
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1380" cy="140" r="220" fill="#7c3aed" opacity="0.18"/>
+  <circle cx="180" cy="760" r="260" fill="#22d3ee" opacity="0.14"/>
+  <text x="800" y="150" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="34" letter-spacing="8" fill="#a5b4fc">EULOGIK · FLASHRANK-PRO</text>
+  <text x="800" y="300" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="118" font-weight="800" fill="#ffffff">FlashRank-Pro Base</text>
+  <text x="800" y="380" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="44" fill="#e2e8f0">A 149M-parameter cross-encoder reranker for production RAG.</text>
+  <text x="800" y="436" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="34" fill="#94a3b8">Small, fast, honest: rerank BM25 candidates with bidirectional ModernBERT attention.</text>
+  <rect x="102" y="520" width="260" height="88" rx="20" fill="#ffffff" opacity="0.08" stroke="#ffffff" stroke-opacity="0.25"/>
+  <rect x="386" y="520" width="260" height="88" rx="20" fill="#ffffff" opacity="0.08" stroke="#ffffff" stroke-opacity="0.25"/>
+  <rect x="670" y="520" width="260" height="88" rx="20" fill="#ffffff" opacity="0.08" stroke="#ffffff" stroke-opacity="0.25"/>
+  <rect x="954" y="520" width="260" height="88" rx="20" fill="#ffffff" opacity="0.08" stroke="#ffffff" stroke-opacity="0.25"/>
+  <rect x="1238" y="520" width="260" height="88" rx="20" fill="#ffffff" opacity="0.08" stroke="#ffffff" stroke-opacity="0.25"/>
+  <text x="232" y="556" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">149M PARAMS</text>
+  <text x="516" y="556" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">MODERNBERT</text>
+  <text x="800" y="556" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">BEIR AVG 0.3314</text>
+  <text x="1084" y="556" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">+22.6% VS INIT*</text>
+  <text x="1368" y="556" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">APACHE-2.0</text>
+  <text x="232" y="588" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">encoder-only</text>
+  <text x="516" y="588" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">bidirectional</text>
+  <text x="800" y="588" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">5-set NDCG@10</text>
+  <text x="1084" y="588" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">same-run protocol</text>
+  <text x="1368" y="588" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">commercial use</text>
+  <rect x="620" y="660" width="360" height="64" rx="32" fill="url(#pill)"/>
+  <text x="800" y="702" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" fill="#06121f">RERANK SMARTER</text>
+  <text x="800" y="792" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="24" fill="#94a3b8">Text-only BM25 top-100 rerank · max_length 256 · webis-touche2020 omitted for RAM</text>
+  <text x="800" y="830" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#64748b">*Session-log comparison against the run initialization checkpoint; not an official BEIR leaderboard score.</text>
+</svg>

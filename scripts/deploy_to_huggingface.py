@@ -16,6 +16,8 @@ def main(
     repo_id: str = "eulogik/flashrank-pro-base",
     private: bool = False,
     token: Optional[str] = None,
+    card_path: Optional[str] = None,
+    assets_path: Optional[str] = None,
 ):
     token = token or os.getenv("HF_TOKEN")
     if not token:
@@ -36,6 +38,22 @@ def main(
         repo_id=repo_id,
         repo_type="model",
     )
+    if card_path:
+        print(f"Uploading model card {card_path} to {repo_id}...")
+        api.upload_file(
+            path_or_fileobj=card_path,
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="model",
+        )
+    if assets_path:
+        print(f"Uploading model card assets {assets_path} to {repo_id}...")
+        api.upload_folder(
+            folder_path=assets_path,
+            path_in_repo="assets",
+            repo_id=repo_id,
+            repo_type="model",
+        )
     print(f"Done! View at https://huggingface.co/{repo_id}")
 
     print(f"\nUsage:")
