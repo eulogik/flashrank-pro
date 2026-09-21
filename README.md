@@ -104,23 +104,13 @@ Model card: `model_cards/flashrank-pro-base/README.md`. Hugging Face: `eulogik/f
 
 ### Architecture
 
-```
-Query + Document ──→ ModernBERT ──→ [CLS] ──→ Linear ──→ Sigmoid ──→ Relevance Score
-     ↕                           (bidirectional encoder)
-  Joint attention on all tokens    149M or 395M params
-```
+![Cross-encoder scoring diagram](model_cards/flashrank-pro-base/assets/architecture.png)
 
 Cross-encoder architecture processes query and document together as a single sequence, enabling deep token-level interactions that dense retrievers miss.
 
 ### Training Pipeline
 
-```
-Stage 1: Data Generation        Stage 2: KD                Stage 3: RL              Stage 4: Merge
-─────────────────────────  ─────────────────────    ────────────────────   ─────────────────────
-HF dataset → query-doc pairs  Teacher → ModernBERT  GRPO prompt warmup     SLERP merge of
-    + hard negative mining    (soft labels, hybrid     + fine-grained score   English + multilingual
-    + teacher scoring         pointwise-MSE loss)       learning (K=8)        + RL checkpoints
-```
+![Training recipe](model_cards/flashrank-pro-base/assets/training.png)
 
 Each stage is independently runnable. Designed for Colab T4 free tier (3-4h sessions) or local Mac M4.
 

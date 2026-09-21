@@ -27,9 +27,12 @@ tags:
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-![ModernBERT](https://img.shields.io/badge/ModernBERT-base-7c3aed)
-![149M](https://img.shields.io/badge/149M-22c55e)
+![Architecture](https://img.shields.io/badge/Architecture-ModernBERT--base-7c3aed)
+![149M](https://img.shields.io/badge/Parameters-149M-22c55e)
 ![NDCG@10 0.3314](https://img.shields.io/badge/NDCG%4010-0.3314-0ea5e9)
+![Same-run +22.6%](https://img.shields.io/badge/Same--run-%2B22.6%25-16a34a)
+![100K MS MARCO](https://img.shields.io/badge/Training-100K%20MS%20MARCO-orange)
+![Transformers](https://img.shields.io/badge/Framework-Transformers-ff9d00)
 
 ![FlashRank-Pro Base overview](assets/hero.png)
 
