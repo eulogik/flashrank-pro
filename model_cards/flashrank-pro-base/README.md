@@ -25,13 +25,11 @@ tags:
 
 # FlashRank-Pro Base
 
+
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-![ModernBERT base](https://img.shields.io/badge/Architecture-ModernBERT--base-7c3aed)
-![149M parameters](https://img.shields.io/badge/Parameters-149M-22c55e)
-![BEIR-style 5-set average NDCG at 10: 0.3314](https://img.shields.io/badge/BEIR--style%205--set%20avg-NDCG%4010%200.3314-0ea5e9)
-![Same-run change: plus 22.6 percent](https://img.shields.io/badge/Same--run%20change-%2B22.6%25-16a34a)
-![Training: 100K MS MARCO](https://img.shields.io/badge/Training-100K%20MS%20MARCO-orange)
-![Framework: Transformers](https://img.shields.io/badge/Framework-Transformers-ff9d00)
+![ModernBERT](https://img.shields.io/badge/ModernBERT-base-7c3aed)
+![149M](https://img.shields.io/badge/149M-22c55e)
+![NDCG@10 0.3314](https://img.shields.io/badge/NDCG%4010-0.3314-0ea5e9)
 
 ![FlashRank-Pro Base overview](assets/hero.png)
 
@@ -47,7 +45,7 @@ tags:
 
 | Use FlashRank-Pro Base when | Do not use it when |
 |---|---|
-| You already retrieve 50-200 candidates with BM25 or embeddings | You need full-corpus retrieval from millions of documents |
+| You already retrieve 50–200 candidates with BM25 or embeddings | You need full-corpus retrieval from millions of documents |
 | You want stronger top-5/top-10 precision in English RAG | You need multilingual, code, or function-call reranking |
 | You want Apache 2.0 commercial use | You need calibrated probabilities for high-stakes decisions |
 | You prefer a small CPU-friendly cross-encoder | You need an official BEIR leaderboard submission |
